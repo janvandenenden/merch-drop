@@ -4,16 +4,16 @@ const mockSend = vi.fn();
 const mockGetSignedUrl = vi.fn();
 
 vi.mock("@aws-sdk/client-s3", () => ({
-  S3Client: vi.fn().mockImplementation(function () {
+  S3Client: vi.fn().mockImplementation(function (this: { send: typeof mockSend }) {
     this.send = mockSend;
   }),
-  PutObjectCommand: vi.fn().mockImplementation(function (input: unknown) {
+  PutObjectCommand: vi.fn().mockImplementation(function (this: { input: unknown }, input: unknown) {
     this.input = input;
   }),
-  GetObjectCommand: vi.fn().mockImplementation(function (input: unknown) {
+  GetObjectCommand: vi.fn().mockImplementation(function (this: { input: unknown }, input: unknown) {
     this.input = input;
   }),
-  DeleteObjectCommand: vi.fn().mockImplementation(function (input: unknown) {
+  DeleteObjectCommand: vi.fn().mockImplementation(function (this: { input: unknown }, input: unknown) {
     this.input = input;
   }),
 }));
