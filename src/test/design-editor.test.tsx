@@ -1,0 +1,221 @@
+import { act, cleanup, renderHook } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
+
+import {
+  MIN_DPI,
+  MIN_PX_H,
+  MIN_PX_W,
+  PRINT_INCHES_W,
+  computeEffectiveDPI,
+  computeInitScale,
+  computePrintedWidthIn,
+  useDesignEditor,
+} from "@/hooks/use-design-editor"
+import { DesignEditor } from "@/components/design-editor"
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const PRINT_AREA_PX_W = 128 // 320 * 0.40 — matches TSHIRT_DISPLAY * PRINT_AREA.width
+
+function makePngFile(name = "design.png") {
+  return new File(["png-content"], name, { type: "image/png" })
+}
+
+function makeJpegFile(name = "photo.jpg") {
+  return new File(["jpeg-content"], name, { type: "image/jpeg" })
+}
+
+// ---------------------------------------------------------------------------
+// computeInitScale
+// ---------------------------------------------------------------------------
+
+describe("computeInitScale", () => {
+  it("fits by width when image is wider relative to print area", () => {
+    // 1800×1200 image, 128×170 print area — width is the tighter constraint
+    const scale = computeInitScale(128, 170, 1800, 1200)
+    expect(scale).toBeCloseTo(128 / 1800)
+  })
+
+  it("fits by height when image is taller relative to print area", () => {
+    // 900×2400 image, 128×170 print area — height is the tighter constraint
+    const scale = computeInitScale(128, 170, 900, 2400)
+    expect(scale).toBeCloseTo(170 / 2400)
+  })
+
+  it("caps at 1 when image is smaller than print area", () => {
+    const scale = computeInitScale(128, 170, 64, 85)
+    expect(scale).toBe(1)
+  })
+
+  it("fills print area exactly for the minimum-res image (1800×2400)", () => {
+    // At initScale the design should just fit — 128/1800 by width
+    const scale = computeInitScale(128, 170, MIN_PX_W, MIN_PX_H)
+    expect(scale).toBeCloseTo(128 / MIN_PX_W)
+  })
+
+  it("swapped dims (rotation) fit correctly", () => {
+    // 2400×1800 (landscape after 90° rotate): effectiveW=2400, effectiveH=1800
+    const scale = computeInitScale(128, 170, 2400, 1800)
+    expect(scale).toBeCloseTo(128 / 2400)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// computeEffectiveDPI
+// ---------------------------------------------------------------------------
+
+describe("computeEffectiveDPI", () => {
+  const maxDPIScale = PRINT_AREA_PX_W / (MIN_DPI * PRINT_INCHES_W)
+
+  it("returns exactly MIN_DPI at maxDPIScale", () => {
+    expect(computeEffectiveDPI(maxDPIScale, PRINT_AREA_PX_W)).toBeCloseTo(MIN_DPI)
+  })
+
+  it("returns higher DPI at half maxDPIScale (smaller design)", () => {
+    expect(computeEffectiveDPI(maxDPIScale / 2, PRINT_AREA_PX_W)).toBeCloseTo(MIN_DPI * 2)
+  })
+
+  it("returns lower DPI at double maxDPIScale (larger design)", () => {
+    expect(computeEffectiveDPI(maxDPIScale * 2, PRINT_AREA_PX_W)).toBeCloseTo(MIN_DPI / 2)
+  })
+
+  it("returns Infinity for scale 0", () => {
+    expect(computeEffectiveDPI(0, PRINT_AREA_PX_W)).toBe(Infinity)
+  })
+
+  it("is image-size independent — same scale yields same DPI regardless of naturalW", () => {
+    const scale = maxDPIScale
+    const dpi1 = computeEffectiveDPI(scale, PRINT_AREA_PX_W)
+    const dpi2 = computeEffectiveDPI(scale, PRINT_AREA_PX_W)
+    expect(dpi1).toBe(dpi2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// computePrintedWidthIn
+// ---------------------------------------------------------------------------
+
+describe("computePrintedWidthIn", () => {
+  it("1800px image at fill scale prints at full print width (12\")", () => {
+    const fillScale = PRINT_AREA_PX_W / MIN_PX_W
+    const inches = computePrintedWidthIn(MIN_PX_W, fillScale, PRINT_AREA_PX_W)
+    expect(inches).toBeCloseTo(PRINT_INCHES_W)
+  })
+
+  it("scales linearly with image width", () => {
+    const scale = 0.05
+    const small = computePrintedWidthIn(900, scale, PRINT_AREA_PX_W)
+    const large = computePrintedWidthIn(1800, scale, PRINT_AREA_PX_W)
+    expect(large).toBeCloseTo(small * 2)
+  })
+
+  it("halving scale halves printed width", () => {
+    const w1 = computePrintedWidthIn(1800, 0.06, PRINT_AREA_PX_W)
+    const w2 = computePrintedWidthIn(1800, 0.03, PRINT_AREA_PX_W)
+    expect(w1).toBeCloseTo(w2 * 2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// useDesignEditor — file validation
+// ---------------------------------------------------------------------------
+
+describe("useDesignEditor — file validation", () => {
+  beforeEach(() => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock")
+    vi.spyOn(URL, "revokeObjectURL").mockReturnValue(undefined)
+  })
+
+  it("sets uploadError and does not open modal for non-PNG", () => {
+    const { result } = renderHook(() => useDesignEditor())
+    act(() => {
+      result.current.handleDrop({
+        preventDefault: vi.fn(),
+        dataTransfer: { files: [makeJpegFile()] },
+      } as unknown as React.DragEvent)
+    })
+    expect(result.current.uploadError).toBe("PNG files only. Please upload a .png file.")
+    expect(result.current.isOpen).toBe(false)
+  })
+
+  it("clears uploadError on valid PNG drop", () => {
+    const { result } = renderHook(() => useDesignEditor())
+
+    // First set an error
+    act(() => {
+      result.current.handleDrop({
+        preventDefault: vi.fn(),
+        dataTransfer: { files: [makeJpegFile()] },
+      } as unknown as React.DragEvent)
+    })
+    expect(result.current.uploadError).not.toBeNull()
+
+    // Then a valid PNG — error should clear (Image.onload fires async so just check error cleared)
+    act(() => {
+      result.current.handleDrop({
+        preventDefault: vi.fn(),
+        dataTransfer: { files: [makePngFile()] },
+      } as unknown as React.DragEvent)
+    })
+    expect(result.current.uploadError).toBeNull()
+  })
+
+  it("does not open modal when no file is provided via input", () => {
+    const { result } = renderHook(() => useDesignEditor())
+    act(() => {
+      result.current.handleFileChange({
+        target: { files: null, value: "" },
+      } as unknown as React.ChangeEvent<HTMLInputElement>)
+    })
+    expect(result.current.isOpen).toBe(false)
+    expect(result.current.uploadError).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// useDesignEditor — rotation
+// ---------------------------------------------------------------------------
+
+describe("useDesignEditor — handleRotate", () => {
+  it("cycles 0 → 270 → 180 → 90 → 0", () => {
+    const { result } = renderHook(() => useDesignEditor())
+    expect(result.current.rotate).toBe(0)
+
+    act(() => result.current.handleRotate())
+    expect(result.current.rotate).toBe(270)
+
+    act(() => result.current.handleRotate())
+    expect(result.current.rotate).toBe(180)
+
+    act(() => result.current.handleRotate())
+    expect(result.current.rotate).toBe(90)
+
+    act(() => result.current.handleRotate())
+    expect(result.current.rotate).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// DesignEditor component — smoke tests
+// ---------------------------------------------------------------------------
+
+describe("DesignEditor component", () => {
+  afterEach(cleanup)
+
+  it("renders upload zone initially", () => {
+    render(<DesignEditor />)
+    expect(screen.getByText("Upload PNG design")).toBeInTheDocument()
+  })
+
+  it("shows error message when a non-PNG file is uploaded", () => {
+    const { container } = render(<DesignEditor />)
+
+    const input = container.querySelector("input[type=file]")!
+    fireEvent.change(input, { target: { files: [makeJpegFile()] } })
+
+    expect(screen.getByText(/PNG files only/)).toBeInTheDocument()
+  })
+})
