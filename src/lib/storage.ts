@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { Readable } from "stream";
 import { getSignedUrl as awsGetSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const SIGNED_URL_TTL_SECONDS = 3600;
@@ -36,6 +37,20 @@ export async function uploadFile(
       ContentType: contentType,
     })
   );
+}
+
+export async function downloadFile(key: string): Promise<Buffer> {
+  const client = getClient();
+  const res = await client.send(
+    new GetObjectCommand({ Bucket: getBucket(), Key: key })
+  );
+  const stream = res.Body as Readable;
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+    stream.on("end", () => resolve(Buffer.concat(chunks)));
+    stream.on("error", reject);
+  });
 }
 
 export async function getSignedUrl(key: string): Promise<string> {
