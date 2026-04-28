@@ -1,3 +1,5 @@
+export const BASE_SHIRT_COST_CENTS = 1200;
+
 const PLATFORM_FEE_RATE = 0.12;
 // Stripe: 2.9% + 30¢
 const STRIPE_PERCENT = 0.029;
