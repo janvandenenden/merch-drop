@@ -1,8 +1,10 @@
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { drop } from "@/lib/db/schema"
+import { drop, user } from "@/lib/db/schema"
 import { generateSlug, ensureUniqueSlug } from "@/lib/slugs"
 import type { InferSelectModel } from "drizzle-orm"
+
+export type Creator = InferSelectModel<typeof user>
 
 export type Drop = InferSelectModel<typeof drop>
 
@@ -116,4 +118,19 @@ export async function updateDrop(dropId: string, params: UpdateDropParams): Prom
 
 export async function deleteDrop(dropId: string, userId: string): Promise<void> {
   await db.delete(drop).where(and(eq(drop.id, dropId), eq(drop.userId, userId)))
+}
+
+export async function getDropBySlug(
+  creatorSlug: string,
+  dropSlug: string
+): Promise<{ drop: Drop; creator: Creator } | null> {
+  const creator = await db.query.user.findFirst({ where: eq(user.slug, creatorSlug) })
+  if (!creator) return null
+
+  const record = await db.query.drop.findFirst({
+    where: and(eq(drop.userId, creator.id), eq(drop.slug, dropSlug)),
+  })
+  if (!record) return null
+
+  return { drop: record, creator }
 }
