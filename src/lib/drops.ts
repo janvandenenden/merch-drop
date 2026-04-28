@@ -113,3 +113,7 @@ export async function updateDrop(dropId: string, params: UpdateDropParams): Prom
 
   return updated
 }
+
+export async function deleteDrop(dropId: string, userId: string): Promise<void> {
+  await db.delete(drop).where(and(eq(drop.id, dropId), eq(drop.userId, userId)))
+}
