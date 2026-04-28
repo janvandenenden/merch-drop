@@ -97,7 +97,7 @@ export default async function DashboardPage() {
                       <p className="text-sm text-muted-foreground flex-1">
                         Connect Stripe to accept payments for this drop.
                       </p>
-                      <Button size="sm" nativeButton={false} render={<Link href="/api/stripe/connect" />}>Enable checkout</Button>
+                      <Button size="sm" nativeButton={false} render={<a href="/api/stripe/connect" />}>Enable checkout</Button>
                     </CardFooter>
                   )}
                 </Card>

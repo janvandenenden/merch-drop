@@ -16,6 +16,7 @@ export type CreateDropParams = {
   supportEmail: string
   markupCents: number
   shirtColor?: string
+  status?: "pre_live" | "live"
 }
 
 export type UpdateDropParams = {
@@ -69,6 +70,7 @@ export async function createDrop(params: CreateDropParams): Promise<Drop> {
       supportEmail: params.supportEmail,
       markupCents: params.markupCents,
       shirtColor: params.shirtColor ?? "white",
+      status: params.status ?? "pre_live",
     })
     .returning()
 
