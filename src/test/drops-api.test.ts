@@ -73,7 +73,7 @@ describe("POST /api/drops", () => {
     const res = await POST(makeRequest(validBody))
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ id: "drop-abc" })
-    expect(mockCreateDrop).toHaveBeenCalledWith({ userId: "user-1", ...validBody })
+    expect(mockCreateDrop).toHaveBeenCalledWith({ userId: "user-1", status: "pre_live", ...validBody })
   })
 
   it("passes optional slug and description when provided", async () => {

@@ -30,6 +30,7 @@ const TSHIRT_DISPLAY = 320
 
 interface DesignEditorProps {
   onChange?: (placement: Placement | null) => void
+  onFileChange?: (file: File) => void
 }
 
 function ScaleSlider({
@@ -64,7 +65,7 @@ function ScaleSlider({
   )
 }
 
-export function DesignEditor({ onChange }: DesignEditorProps) {
+export function DesignEditor({ onChange, onFileChange }: DesignEditorProps) {
   const {
     imageUrl,
     naturalW,
@@ -82,7 +83,7 @@ export function DesignEditor({ onChange }: DesignEditorProps) {
     handleScaleChange,
     handleSubmit,
     setIsOpen,
-  } = useDesignEditor(onChange)
+  } = useDesignEditor(onChange, onFileChange)
 
   const [liveScale, setLiveScale] = useState(1)
 
@@ -262,7 +263,9 @@ export function DesignEditor({ onChange }: DesignEditorProps) {
             <Button variant="outline" onClick={() => setIsOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit}>Save placement</Button>
+            <Button onClick={handleSubmit} disabled={belowMinRes}>
+              Save placement
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

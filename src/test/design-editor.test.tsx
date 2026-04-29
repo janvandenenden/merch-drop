@@ -1,6 +1,16 @@
-import { act, cleanup, renderHook } from "@testing-library/react"
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react"
 import { fireEvent, render, screen } from "@testing-library/react"
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
+
+// Hoisted — must appear before any import that pulls in react-zoom-pan-pinch
+vi.mock("react-zoom-pan-pinch", () => {
+  const TransformWrapper = vi.fn(({ onInit, children }: any) => {
+    onInit?.({ state: { scale: 0.01 } })
+    return children
+  })
+  const TransformComponent = vi.fn(({ children }: any) => children)
+  return { TransformWrapper, TransformComponent }
+})
 
 import {
   MIN_DPI,
@@ -217,5 +227,150 @@ describe("DesignEditor component", () => {
     fireEvent.change(input, { target: { files: [makeJpegFile()] } })
 
     expect(screen.getByText(/PNG files only/)).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// useDesignEditor — onFileChange callback
+// ---------------------------------------------------------------------------
+
+describe("useDesignEditor — onFileChange callback", () => {
+  beforeEach(() => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock")
+    vi.spyOn(URL, "revokeObjectURL").mockReturnValue(undefined)
+    vi.stubGlobal(
+      "Image",
+      class {
+        naturalWidth = 1800
+        naturalHeight = 2400
+        onload: (() => void) | null = null
+        set src(_: string) {
+          this.onload?.()
+        }
+      },
+    )
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it("fires onFileChange with the File when a valid PNG is dropped", async () => {
+    const onFileChange = vi.fn()
+    const { result } = renderHook(() => useDesignEditor(undefined, onFileChange))
+    const file = makePngFile()
+
+    await act(async () => {
+      result.current.handleDrop({
+        preventDefault: vi.fn(),
+        dataTransfer: { files: [file] },
+      } as unknown as React.DragEvent)
+    })
+
+    expect(onFileChange).toHaveBeenCalledOnce()
+    expect(onFileChange).toHaveBeenCalledWith(file)
+  })
+
+  it("does not fire onFileChange for non-PNG files", async () => {
+    const onFileChange = vi.fn()
+    const { result } = renderHook(() => useDesignEditor(undefined, onFileChange))
+
+    await act(async () => {
+      result.current.handleDrop({
+        preventDefault: vi.fn(),
+        dataTransfer: { files: [makeJpegFile()] },
+      } as unknown as React.DragEvent)
+    })
+
+    expect(onFileChange).not.toHaveBeenCalled()
+  })
+
+  it("fires onFileChange again when image is replaced", async () => {
+    const onFileChange = vi.fn()
+    const { result } = renderHook(() => useDesignEditor(undefined, onFileChange))
+    const first = makePngFile()
+    const second = new File(["png2"], "second.png", { type: "image/png" })
+
+    await act(async () => {
+      result.current.handleDrop({
+        preventDefault: vi.fn(),
+        dataTransfer: { files: [first] },
+      } as unknown as React.DragEvent)
+    })
+    await act(async () => {
+      result.current.handleFileChange({
+        target: { files: [second], value: "" },
+      } as unknown as React.ChangeEvent<HTMLInputElement>)
+    })
+
+    expect(onFileChange).toHaveBeenCalledTimes(2)
+    expect(onFileChange).toHaveBeenNthCalledWith(2, second)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// DesignEditor component — Save placement button / belowMinRes
+// ---------------------------------------------------------------------------
+
+describe("DesignEditor — Save placement button respects resolution", () => {
+  // maxDPIScale = (320 * 0.40) / (150 * 12) ≈ 0.0711
+  // TransformWrapper mock (top of file) calls onInit with scale=0.01 → button enabled
+  // Overriding per-test to call onInit with scale=1 → button disabled
+
+  beforeEach(() => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock")
+    vi.spyOn(URL, "revokeObjectURL").mockReturnValue(undefined)
+    vi.stubGlobal(
+      "Image",
+      class {
+        naturalWidth = 1800
+        naturalHeight = 2400
+        onload: (() => void) | null = null
+        set src(_: string) {
+          this.onload?.()
+        }
+      },
+    )
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    cleanup()
+  })
+
+  async function uploadPng(container: HTMLElement) {
+    const input = container.querySelector("input[type=file]")!
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [makePngFile()] } })
+    })
+  }
+
+  it("enables Save placement when scale is below maxDPIScale", async () => {
+    // Default mock calls onInit with scale=0.01 which is below maxDPIScale ≈ 0.071
+    const { container } = render(<DesignEditor />)
+    await uploadPng(container)
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save placement" })).not.toBeDisabled()
+    })
+  })
+
+  it("disables Save placement when scale exceeds maxDPIScale (low resolution)", async () => {
+    const { TransformWrapper } = await import("react-zoom-pan-pinch")
+    ;(TransformWrapper as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      ({ onInit, children }: any) => {
+        onInit?.({ state: { scale: 1 } }) // scale=1 >> maxDPIScale → belowMinRes
+        return children
+      },
+    )
+
+    const { container } = render(<DesignEditor />)
+    await uploadPng(container)
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save placement" })).toBeDisabled()
+    })
   })
 })

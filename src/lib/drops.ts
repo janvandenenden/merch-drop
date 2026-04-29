@@ -29,7 +29,7 @@ export type UpdateDropParams = {
   designFileKey?: string
   printFileKey?: string
   mockupUrl?: string
-  placement?: { x: number; y: number; scale: number }
+  placement?: { x: number; y: number; scale: number; rotate: number }
   status?: "pre_live" | "live" | "closed"
 }
 

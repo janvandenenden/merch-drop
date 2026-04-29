@@ -48,7 +48,10 @@ export type Placement = {
   rotate: number
 }
 
-export function useDesignEditor(onChange?: (placement: Placement | null) => void) {
+export function useDesignEditor(
+  onChange?: (placement: Placement | null) => void,
+  onFileChange?: (file: File) => void,
+) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [naturalW, setNaturalW] = useState(0)
   const [naturalH, setNaturalH] = useState(0)
@@ -58,7 +61,6 @@ export function useDesignEditor(onChange?: (placement: Placement | null) => void
 
   const transformRef = useRef<ReactZoomPanPinchRef>(null)
   const replaceInputRef = useRef<HTMLInputElement>(null)
-
 
   function loadFile(file: File) {
     if (file.type !== "image/png") {
@@ -75,6 +77,7 @@ export function useDesignEditor(onChange?: (placement: Placement | null) => void
       setImageUrl(url)
       setRotate(0)
       setIsOpen(true)
+      onFileChange?.(file)
     }
     img.src = url
   }
