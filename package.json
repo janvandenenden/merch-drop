@@ -8,7 +8,8 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "seed": "npx tsx --env-file=.env.local scripts/seed.ts"
+    "seed": "npx tsx --env-file=.env.local scripts/seed.ts",
+    "reset-stripe": "npx tsx --env-file=.env.local scripts/reset-stripe.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",
