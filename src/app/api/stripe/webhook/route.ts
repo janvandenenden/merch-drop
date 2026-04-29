@@ -7,6 +7,7 @@ import { user, drop, order } from "@/lib/db/schema"
 import { submitOrder } from "@/lib/printful"
 import { getSignedUrl } from "@/lib/storage"
 import { BC3001_VARIANTS } from "@/lib/variants"
+import { sendOrderCancelledBuyer, sendOrderCancelledCreator } from "@/lib/email"
 
 export async function POST(request: Request) {
   const body = await request.text()
@@ -94,7 +95,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     })
     .returning()
 
-  // Mark first sale timestamp
+  // Mark first sale — triggers price/design lock on the drop
   if (!record.firstSaleAt) {
     await db
       .update(drop)
@@ -128,6 +129,45 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       .set({ status: "submitted", printfulOrderId: String(printfulOrder.id) })
       .where(eq(order.id, newOrder.id))
   } catch {
-    // Order stays as "paid" for manual review if Printful submission fails
+    await handlePrintfulRejection(session, newOrder.id, record, buyerEmail)
   }
+}
+
+async function handlePrintfulRejection(
+  session: Stripe.Checkout.Session,
+  orderId: string,
+  dropRecord: { userId: string; title: string },
+  buyerEmail: string,
+) {
+  const paymentIntentId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent?.id
+
+  if (paymentIntentId) {
+    try {
+      await stripe.refunds.create({
+        payment_intent: paymentIntentId,
+        reverse_transfer: true,
+        refund_application_fee: true,
+      })
+    } catch {
+      // Refund failure should not block cancellation or notifications
+    }
+  }
+
+  await db.update(order).set({ status: "cancelled" }).where(eq(order.id, orderId))
+
+  const [creator] = await db
+    .select({ email: user.email })
+    .from(user)
+    .where(eq(user.id, dropRecord.userId))
+    .limit(1)
+
+  await Promise.allSettled([
+    sendOrderCancelledBuyer(buyerEmail, dropRecord.title),
+    creator
+      ? sendOrderCancelledCreator(creator.email, dropRecord.title)
+      : Promise.resolve(),
+  ])
 }
