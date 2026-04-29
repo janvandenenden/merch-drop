@@ -2,7 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "**.printful.com" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "**.printful.com" },
+      { protocol: "https", hostname: "**.r2.cloudflarestorage.com" },
+    ],
   },
 };
 

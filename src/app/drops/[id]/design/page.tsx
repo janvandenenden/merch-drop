@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { getDrop } from "@/lib/drops"
+import { getSignedUrl } from "@/lib/storage"
 import { DesignStep } from "@/components/drops/design-step"
 
 export default async function DesignPage({
@@ -28,7 +29,7 @@ export default async function DesignPage({
         </div>
         <DesignStep
           dropId={id}
-          initialMockupUrl={drop.mockupUrl ?? undefined}
+          initialMockupUrl={drop.mockupKey ? await getSignedUrl(drop.mockupKey) : undefined}
           locked={!!drop.firstSaleAt}
         />
       </div>

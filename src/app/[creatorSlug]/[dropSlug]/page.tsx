@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import Image from "next/image"
 import { getDropBySlug } from "@/lib/drops"
+import { getSignedUrl } from "@/lib/storage"
 import { calculatePrice, BASE_SHIRT_COST_CENTS } from "@/lib/pricing"
 import { BuyForm } from "@/components/drops/buy-form"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -15,6 +16,7 @@ export default async function PublicDropPage({ params }: Props) {
   if (!result) notFound()
 
   const { drop } = result
+  const mockupUrl = drop.mockupKey ? await getSignedUrl(drop.mockupKey) : null
 
   if (drop.status === "pre_live") {
     return (
@@ -72,9 +74,9 @@ export default async function PublicDropPage({ params }: Props) {
       <div className="w-full max-w-4xl">
         <div className="grid gap-8 md:grid-cols-2">
           <div className="overflow-hidden rounded-xl bg-muted">
-            {drop.mockupUrl ? (
+            {mockupUrl ? (
               <Image
-                src={drop.mockupUrl}
+                src={mockupUrl}
                 alt={drop.title}
                 width={600}
                 height={600}

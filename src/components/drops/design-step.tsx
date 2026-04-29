@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { DesignEditor } from "@/components/design-editor"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { getDesignUploadUrl, runPipeline } from "@/app/drops/[id]/design/actions"
 import type { Placement } from "@/lib/design-constants"
 
@@ -72,9 +72,7 @@ export function DesignStep({
           <Button variant="outline" onClick={() => setPhase("idle")}>
             Edit placement
           </Button>
-          <Button asChild>
-            <Link href={`/drops/${dropId}/publish`}>Continue →</Link>
-          </Button>
+          <Link href={`/drops/${dropId}/publish`} className={buttonVariants()}>Continue →</Link>
         </div>
       </div>
     )

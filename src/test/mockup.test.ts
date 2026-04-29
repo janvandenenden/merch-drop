@@ -13,7 +13,12 @@ vi.mock("../lib/db", () => ({
 }))
 
 const mockGetSignedUrl = vi.fn()
-vi.mock("../lib/storage", () => ({ getSignedUrl: mockGetSignedUrl }))
+const mockUploadFile = vi.fn()
+vi.mock("../lib/storage", () => ({
+  getSignedUrl: mockGetSignedUrl,
+  uploadFile: mockUploadFile,
+  storageKeys: { mockup: (id: string) => `mockups/${id}` },
+}))
 
 const mockPrintfulGenerateMockup = vi.fn()
 vi.mock("../lib/printful", () => ({ generateMockup: mockPrintfulGenerateMockup }))
@@ -24,11 +29,18 @@ beforeEach(() => {
   mockSet.mockReset()
   mockWhere.mockReset()
   mockGetSignedUrl.mockReset()
+  mockUploadFile.mockReset()
   mockPrintfulGenerateMockup.mockReset()
 
   mockWhere.mockResolvedValue(undefined)
   mockSet.mockReturnValue({ where: mockWhere })
   mockUpdate.mockReturnValue({ set: mockSet })
+  mockUploadFile.mockResolvedValue(undefined)
+
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    ok: true,
+    arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+  }))
 })
 
 describe("generateMockup", () => {
@@ -39,21 +51,25 @@ describe("generateMockup", () => {
   })
 
   it("throws if printFileKey is missing", async () => {
-    mockFindFirst.mockResolvedValue({ id: "1", printFileKey: null, firstSaleAt: null, mockupUrl: null })
+    mockFindFirst.mockResolvedValue({ id: "1", printFileKey: null, firstSaleAt: null, mockupKey: null })
     const { generateMockup } = await import("../lib/mockup")
     await expect(generateMockup("1")).rejects.toThrow("Drop has no print file")
   })
 
-  it("returns cached mockupUrl after first sale", async () => {
+  it("returns cached signed url after first sale without regenerating", async () => {
     mockFindFirst.mockResolvedValue({
       id: "1",
       printFileKey: "print-files/abc",
       firstSaleAt: new Date(),
-      mockupUrl: "https://cached.example.com/mockup.jpg",
+      mockupKey: "mockups/cached.png",
     })
+    mockGetSignedUrl.mockResolvedValue("https://r2.example.com/mockups/cached.png")
+
     const { generateMockup } = await import("../lib/mockup")
     const url = await generateMockup("1")
-    expect(url).toBe("https://cached.example.com/mockup.jpg")
+
+    expect(url).toBe("https://r2.example.com/mockups/cached.png")
+    expect(mockGetSignedUrl).toHaveBeenCalledWith("mockups/cached.png")
     expect(mockPrintfulGenerateMockup).not.toHaveBeenCalled()
   })
 
@@ -62,9 +78,11 @@ describe("generateMockup", () => {
       id: "1",
       printFileKey: "print-files/abc",
       firstSaleAt: null,
-      mockupUrl: "https://stale.example.com/old.jpg",
+      mockupKey: null,
     })
-    mockGetSignedUrl.mockResolvedValue("https://signed.example.com/print.png")
+    mockGetSignedUrl
+      .mockResolvedValueOnce("https://signed.example.com/print.png")
+      .mockResolvedValueOnce("https://r2.example.com/mockups/new.png")
     mockPrintfulGenerateMockup.mockResolvedValue("https://printful.example.com/new.jpg")
 
     const { generateMockup } = await import("../lib/mockup")
@@ -72,25 +90,27 @@ describe("generateMockup", () => {
 
     expect(mockGetSignedUrl).toHaveBeenCalledWith("print-files/abc")
     expect(mockPrintfulGenerateMockup).toHaveBeenCalledWith("https://signed.example.com/print.png", [4012])
-    expect(url).toBe("https://printful.example.com/new.jpg")
+    expect(mockUploadFile).toHaveBeenCalled()
+    expect(url).toBe("https://r2.example.com/mockups/new.png")
   })
 
-  it("stores returned mockupUrl on the drop record", async () => {
+  it("stores mockupKey on the drop record", async () => {
     mockFindFirst.mockResolvedValue({
       id: "drop-42",
       printFileKey: "print-files/xyz",
       firstSaleAt: null,
-      mockupUrl: null,
+      mockupKey: null,
     })
-    mockGetSignedUrl.mockResolvedValue("https://signed.example.com/print.png")
+    mockGetSignedUrl
+      .mockResolvedValueOnce("https://signed.example.com/print.png")
+      .mockResolvedValueOnce("https://r2.example.com/mockups/new.png")
     mockPrintfulGenerateMockup.mockResolvedValue("https://printful.example.com/mockup.jpg")
 
     const { generateMockup } = await import("../lib/mockup")
     await generateMockup("drop-42")
 
-    expect(mockUpdate).toHaveBeenCalled()
     expect(mockSet).toHaveBeenCalledWith(
-      expect.objectContaining({ mockupUrl: "https://printful.example.com/mockup.jpg" }),
+      expect.objectContaining({ mockupKey: expect.stringMatching(/^mockups\//) }),
     )
   })
 })
