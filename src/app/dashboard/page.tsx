@@ -21,12 +21,14 @@ import type { Drop } from "@/lib/drops"
 const STATUS_LABELS: Record<Drop["status"], string> = {
   pre_live: "Pre-live",
   live: "Live",
+  paused: "Paused",
   closed: "Closed",
 }
 
 const STATUS_CLASSES: Record<Drop["status"], string> = {
   pre_live: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
   live: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  paused: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
   closed: "bg-muted text-muted-foreground",
 }
 
@@ -39,6 +41,49 @@ export default async function DashboardPage() {
   const { user } = session
   const drops = await listDrops(user.id)
   const needsStripe = !user.chargesEnabled
+
+  const activeDrops = drops.filter((d) => d.status !== "closed")
+  const closedDrops = drops.filter((d) => d.status === "closed")
+
+  function renderDrop(drop: Drop) {
+    const shareUrl = `${BASE_URL}/${user.slug}/${drop.slug}`
+    const showEnableCheckout = drop.status === "pre_live" && needsStripe
+
+    return (
+      <Card key={drop.id}>
+        <CardHeader>
+          <CardTitle>{drop.title}</CardTitle>
+          <CardDescription className="font-mono text-xs">
+            {shareUrl}
+          </CardDescription>
+          <CardAction>
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASSES[drop.status]}`}
+            >
+              {STATUS_LABELS[drop.status]}
+            </span>
+          </CardAction>
+        </CardHeader>
+
+        <CardContent className="flex flex-wrap items-center gap-2">
+          <CopyButton text={shareUrl} />
+          {drop.status !== "closed" && (
+            <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/drops/${drop.id}/edit`} />}>Edit</Button>
+          )}
+          <DropActions drop={drop} chargesEnabled={!!user.chargesEnabled} />
+        </CardContent>
+
+        {showEnableCheckout && (
+          <CardFooter className="gap-3">
+            <p className="text-sm text-muted-foreground flex-1">
+              Connect Stripe to accept payments for this drop.
+            </p>
+            <Button size="sm" nativeButton={false} render={<a href="/api/stripe/connect" />}>Enable checkout</Button>
+          </CardFooter>
+        )}
+      </Card>
+    )
+  }
 
   return (
     <main className="min-h-screen p-8">
@@ -64,45 +109,25 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="flex flex-col gap-4">
-            {drops.map((drop) => {
-              const shareUrl = `${BASE_URL}/${user.slug}/${drop.slug}`
-              const showEnableCheckout =
-                drop.status === "pre_live" && needsStripe
+          <div className="space-y-10">
+            {activeDrops.length > 0 && (
+              <div className="flex flex-col gap-4">
+                {activeDrops.map(renderDrop)}
+              </div>
+            )}
 
-              return (
-                <Card key={drop.id}>
-                  <CardHeader>
-                    <CardTitle>{drop.title}</CardTitle>
-                    <CardDescription className="font-mono text-xs">
-                      {shareUrl}
-                    </CardDescription>
-                    <CardAction>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASSES[drop.status]}`}
-                      >
-                        {STATUS_LABELS[drop.status]}
-                      </span>
-                    </CardAction>
-                  </CardHeader>
-
-                  <CardContent className="flex flex-wrap items-center gap-2">
-                    <CopyButton text={shareUrl} />
-                    <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/drops/${drop.id}/edit`} />}>Edit</Button>
-                    <DropActions drop={drop} />
-                  </CardContent>
-
-                  {showEnableCheckout && (
-                    <CardFooter className="gap-3">
-                      <p className="text-sm text-muted-foreground flex-1">
-                        Connect Stripe to accept payments for this drop.
-                      </p>
-                      <Button size="sm" nativeButton={false} render={<a href="/api/stripe/connect" />}>Enable checkout</Button>
-                    </CardFooter>
-                  )}
-                </Card>
-              )
-            })}
+            {closedDrops.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Closed</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <div className="flex flex-col gap-4">
+                  {closedDrops.map(renderDrop)}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

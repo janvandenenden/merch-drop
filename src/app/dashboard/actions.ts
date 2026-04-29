@@ -12,8 +12,20 @@ async function requireSession() {
   return session
 }
 
+export async function goLiveDropAction(dropId: string) {
+  await requireSession()
+  await updateDrop(dropId, { status: "live" })
+  revalidatePath("/dashboard")
+}
+
+export async function pauseDropAction(dropId: string) {
+  await requireSession()
+  await updateDrop(dropId, { status: "paused" })
+  revalidatePath("/dashboard")
+}
+
 export async function closeDropAction(dropId: string) {
-  const { user } = await requireSession()
+  await requireSession()
   await updateDrop(dropId, { status: "closed" })
   revalidatePath("/dashboard")
 }

@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import { DesignEditor } from "@/components/design-editor"
 import { Button, buttonVariants } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { getDesignUploadUrl, runPipeline } from "@/app/drops/[id]/design/actions"
 import type { Placement } from "@/lib/design-constants"
+import { cn } from "@/lib/utils"
 
 type Phase = "idle" | "uploading" | "processing" | "preview"
 
@@ -23,6 +25,7 @@ export function DesignStep({
   const [file, setFile] = useState<File | null>(null)
   const [mockupUrl, setMockupUrl] = useState<string | null>(initialMockupUrl ?? null)
   const [error, setError] = useState<string | null>(null)
+  const [tosAccepted, setTosAccepted] = useState(false)
 
   async function handleGenerate() {
     if (!file || !placement) return
@@ -68,11 +71,27 @@ export function DesignStep({
       <div className="space-y-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={mockupUrl} alt="Mockup" className="rounded-lg border" />
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="tos"
+            checked={tosAccepted}
+            onCheckedChange={(checked) => setTosAccepted(checked === true)}
+          />
+          <Label htmlFor="tos" className="cursor-pointer text-sm leading-snug">
+            I own the rights to this design and accept the refund policy
+          </Label>
+        </div>
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => setPhase("idle")}>
             Edit placement
           </Button>
-          <Link href={`/drops/${dropId}/publish`} className={buttonVariants()}>Continue →</Link>
+          <a
+            href="/dashboard"
+            className={cn(buttonVariants(), !tosAccepted && "pointer-events-none opacity-50")}
+            aria-disabled={!tosAccepted}
+          >
+            Done →
+          </a>
         </div>
       </div>
     )

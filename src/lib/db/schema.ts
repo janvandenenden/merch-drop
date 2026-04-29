@@ -13,6 +13,7 @@ import {
 export const dropStatusEnum = pgEnum("drop_status", [
   "pre_live",
   "live",
+  "paused",
   "closed",
 ]);
 

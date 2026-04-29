@@ -18,7 +18,7 @@ export default async function PublicDropPage({ params }: Props) {
   const { drop } = result
   const mockupUrl = drop.mockupKey ? await getSignedUrl(drop.mockupKey) : null
 
-  if (drop.status === "pre_live") {
+  if (drop.status === "pre_live" || drop.status === "paused") {
     return (
       <main className="flex min-h-screen items-center justify-center p-8">
         <Card className="w-full max-w-md text-center">

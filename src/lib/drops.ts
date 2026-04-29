@@ -31,12 +31,13 @@ export type UpdateDropParams = {
   mockupUrl?: string
   mockupKey?: string
   placement?: { x: number; y: number; scale: number; rotate: number }
-  status?: "pre_live" | "live" | "closed"
+  status?: "pre_live" | "live" | "paused" | "closed"
 }
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pre_live: ["live"],
-  live: ["closed"],
+  live: ["paused", "closed"],
+  paused: ["live", "closed"],
   closed: [],
 }
 

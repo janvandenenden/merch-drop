@@ -25,8 +25,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const status = session.user.chargesEnabled ? "live" : "pre_live"
-    const drop = await createDrop({ userId: session.user.id, status, ...parsed.data })
+    const drop = await createDrop({ userId: session.user.id, status: "pre_live", ...parsed.data })
     return NextResponse.json({ id: drop.id })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create drop"
