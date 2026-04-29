@@ -83,6 +83,23 @@ describe("getSignedUrl", () => {
   });
 });
 
+describe("getPresignedUploadUrl", () => {
+  it("returns presigned PUT URL from presigner", async () => {
+    mockGetSignedUrl.mockResolvedValue("https://signed.url/upload-key");
+    const { getPresignedUploadUrl } = await import("../lib/storage");
+
+    const url = await getPresignedUploadUrl("designs/abc.png", "image/png");
+
+    expect(url).toBe("https://signed.url/upload-key");
+    const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+    expect(PutObjectCommand).toHaveBeenCalledWith({
+      Bucket: "test-bucket",
+      Key: "designs/abc.png",
+      ContentType: "image/png",
+    });
+  });
+});
+
 describe("storageKeys", () => {
   it("prefixes design keys correctly", async () => {
     const { storageKeys } = await import("../lib/storage");

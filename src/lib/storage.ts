@@ -16,6 +16,8 @@ function getClient(): S3Client {
       accessKeyId: process.env.R2_ACCESS_KEY_ID!,
       secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
     },
+    requestChecksumCalculation: "WHEN_REQUIRED" as never,
+    responseChecksumValidation: "WHEN_REQUIRED" as never,
   });
 }
 
@@ -53,6 +55,14 @@ export async function downloadFile(key: string): Promise<Buffer> {
   });
 }
 
+export async function getPresignedUploadUrl(key: string, contentType: string): Promise<string> {
+  return awsGetSignedUrl(
+    getClient(),
+    new PutObjectCommand({ Bucket: getBucket(), Key: key, ContentType: contentType }),
+    { expiresIn: SIGNED_URL_TTL_SECONDS }
+  );
+}
+
 export async function getSignedUrl(key: string): Promise<string> {
   const client = getClient();
   return awsGetSignedUrl(
@@ -65,4 +75,5 @@ export async function getSignedUrl(key: string): Promise<string> {
 export const storageKeys = {
   design: (id: string) => `designs/${id}`,
   printFile: (id: string) => `print-files/${id}`,
+  mockup: (id: string) => `mockups/${id}`,
 };

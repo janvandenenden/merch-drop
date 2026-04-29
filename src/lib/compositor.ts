@@ -8,6 +8,7 @@ export type Placement = {
   x: number;
   y: number;
   scale: number;
+  rotate: number;
 };
 
 export async function compositePrintFile(
@@ -16,14 +17,19 @@ export async function compositePrintFile(
 ): Promise<string> {
   const designBuffer = await downloadFile(designKey);
 
-  const designMeta = await sharp(designBuffer).metadata();
+  let workingBuffer = designBuffer;
+  if (placement.rotate !== 0) {
+    workingBuffer = await sharp(designBuffer).rotate(placement.rotate).toBuffer();
+  }
+
+  const designMeta = await sharp(workingBuffer).metadata();
   const designWidth = designMeta.width ?? 0;
   const designHeight = designMeta.height ?? 0;
 
   const scaledWidth = Math.round(designWidth * placement.scale);
   const scaledHeight = Math.round(designHeight * placement.scale);
 
-  const resized = await sharp(designBuffer)
+  const resized = await sharp(workingBuffer)
     .resize(scaledWidth, scaledHeight, { fit: "fill" })
     .png()
     .toBuffer();

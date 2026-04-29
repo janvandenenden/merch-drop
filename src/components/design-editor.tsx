@@ -18,15 +18,15 @@ import {
   PRINT_AREA,
   PRINT_INCHES_W,
   PRINT_INCHES_H,
+  TSHIRT_DISPLAY,
+  type Placement,
+} from "@/lib/design-constants"
+import {
   computeInitScale,
   computeEffectiveDPI,
   computePrintedWidthIn,
-  type Placement,
   useDesignEditor,
 } from "@/hooks/use-design-editor"
-
-// Display size of the t-shirt image inside the modal
-const TSHIRT_DISPLAY = 320
 
 interface DesignEditorProps {
   onChange?: (placement: Placement | null) => void
