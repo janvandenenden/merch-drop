@@ -2,21 +2,23 @@
 
 import { useRef, useState } from "react"
 import type { ReactZoomPanPinchRef } from "react-zoom-pan-pinch"
+import {
+  PRINT_INCHES_W,
+  PRINT_AREA,
+  MIN_DPI,
+  type Placement,
+} from "@/lib/design-constants"
 
-// BC 3001 front print area: 12" × 16" @ 150 DPI minimum
-export const PRINT_INCHES_W = 12
-export const PRINT_INCHES_H = 16
-export const MIN_DPI = 150
-export const MIN_PX_W = PRINT_INCHES_W * MIN_DPI // 1800
-export const MIN_PX_H = PRINT_INCHES_H * MIN_DPI // 2400
-
-// Print area position on the 1000×1000 t-shirt template (fraction of image size)
-export const PRINT_AREA = {
-  left: 0.30,
-  top: 0.24,
-  width: 0.40,
-  height: 0.53,
-} as const
+export {
+  PRINT_INCHES_W,
+  PRINT_INCHES_H,
+  MIN_DPI,
+  MIN_PX_W,
+  MIN_PX_H,
+  PRINT_AREA,
+  TSHIRT_DISPLAY,
+  type Placement,
+} from "@/lib/design-constants"
 
 // Pure math helpers — exported for testing
 export function computeInitScale(
@@ -41,16 +43,9 @@ export function computePrintedWidthIn(
   return (naturalW * scale / printAreaPxW) * PRINT_INCHES_W
 }
 
-export type Placement = {
-  x: number
-  y: number
-  scale: number
-  rotate: number
-}
-
 export function useDesignEditor(
   onChange?: (placement: Placement | null) => void,
-  onFileChange?: (file: File) => void,
+  onFileChange?: (file: File) => void
 ) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [naturalW, setNaturalW] = useState(0)
@@ -58,6 +53,7 @@ export function useDesignEditor(
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
   const [rotate, setRotate] = useState(0)
+  const [currentFile, setCurrentFile] = useState<File | null>(null)
 
   const transformRef = useRef<ReactZoomPanPinchRef>(null)
   const replaceInputRef = useRef<HTMLInputElement>(null)
@@ -68,6 +64,7 @@ export function useDesignEditor(
       return
     }
     setUploadError(null)
+    setCurrentFile(file)
 
     const url = URL.createObjectURL(file)
     const img = new window.Image()
@@ -133,6 +130,7 @@ export function useDesignEditor(
     uploadError,
     isOpen,
     rotate,
+    currentFile,
     transformRef,
     replaceInputRef,
     handleFileChange,

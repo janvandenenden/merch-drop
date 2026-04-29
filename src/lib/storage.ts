@@ -53,6 +53,14 @@ export async function downloadFile(key: string): Promise<Buffer> {
   });
 }
 
+export async function getPresignedUploadUrl(key: string, contentType: string): Promise<string> {
+  return awsGetSignedUrl(
+    getClient(),
+    new PutObjectCommand({ Bucket: getBucket(), Key: key, ContentType: contentType }),
+    { expiresIn: SIGNED_URL_TTL_SECONDS }
+  );
+}
+
 export async function getSignedUrl(key: string): Promise<string> {
   const client = getClient();
   return awsGetSignedUrl(

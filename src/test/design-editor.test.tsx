@@ -17,6 +17,8 @@ import {
   MIN_PX_H,
   MIN_PX_W,
   PRINT_INCHES_W,
+} from "@/lib/design-constants"
+import {
   computeEffectiveDPI,
   computeInitScale,
   computePrintedWidthIn,

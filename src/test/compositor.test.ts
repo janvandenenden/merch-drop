@@ -39,7 +39,7 @@ describe("compositePrintFile", () => {
       "../lib/compositor"
     );
 
-    await compositePrintFile("designs/test.png", { x: 0, y: 0, scale: 1 });
+    await compositePrintFile("designs/test.png", { x: 0, y: 0, scale: 1, rotate: 0 });
 
     const uploaded: Buffer = mockUploadFile.mock.calls[0][1];
     const meta = await sharp(uploaded).metadata();
@@ -54,7 +54,7 @@ describe("compositePrintFile", () => {
     mockUploadFile.mockResolvedValue(undefined);
 
     const { compositePrintFile } = await import("../lib/compositor");
-    await compositePrintFile("designs/test.png", { x: 0, y: 0, scale: 1 });
+    await compositePrintFile("designs/test.png", { x: 0, y: 0, scale: 1, rotate: 0 });
 
     const uploaded: Buffer = mockUploadFile.mock.calls[0][1];
     const meta = await sharp(uploaded).metadata();
@@ -68,7 +68,7 @@ describe("compositePrintFile", () => {
 
     const { compositePrintFile } = await import("../lib/compositor");
     // scale 0.5 → 100×100 placed at (0,0); pixel at (50,50) should be red
-    await compositePrintFile("designs/test.png", { x: 0, y: 0, scale: 0.5 });
+    await compositePrintFile("designs/test.png", { x: 0, y: 0, scale: 0.5, rotate: 0 });
 
     const uploaded: Buffer = mockUploadFile.mock.calls[0][1];
     const { data } = await sharp(uploaded)
@@ -89,7 +89,7 @@ describe("compositePrintFile", () => {
 
     const { compositePrintFile } = await import("../lib/compositor");
     // place at (500, 600); pixel at (550, 650) should be red
-    await compositePrintFile("designs/test.png", { x: 500, y: 600, scale: 1 });
+    await compositePrintFile("designs/test.png", { x: 500, y: 600, scale: 1, rotate: 0 });
 
     const uploaded: Buffer = mockUploadFile.mock.calls[0][1];
     const { data } = await sharp(uploaded)
@@ -112,6 +112,7 @@ describe("compositePrintFile", () => {
       x: 0,
       y: 0,
       scale: 1,
+      rotate: 0,
     });
 
     expect(key).toMatch(/^print-files\//);
@@ -128,8 +129,24 @@ describe("compositePrintFile", () => {
     mockUploadFile.mockResolvedValue(undefined);
 
     const { compositePrintFile } = await import("../lib/compositor");
-    await compositePrintFile("designs/my-design.png", { x: 0, y: 0, scale: 1 });
+    await compositePrintFile("designs/my-design.png", { x: 0, y: 0, scale: 1, rotate: 0 });
 
     expect(mockDownloadFile).toHaveBeenCalledWith("designs/my-design.png");
+  });
+
+  it("applies rotation — 90° rotate swaps image dimensions before composite", async () => {
+    // 200×100 image rotated 90° becomes 100×200
+    const design = await makePng(200, 100);
+    mockDownloadFile.mockResolvedValue(design);
+    mockUploadFile.mockResolvedValue(undefined);
+
+    const { compositePrintFile } = await import("../lib/compositor");
+    await compositePrintFile("designs/test.png", { x: 0, y: 0, scale: 1, rotate: 90 });
+
+    const uploaded: Buffer = mockUploadFile.mock.calls[0][1];
+    const meta = await sharp(uploaded).metadata();
+    // Canvas is always PRINT_CANVAS size regardless of rotation
+    expect(meta.width).toBe(1800);
+    expect(meta.height).toBe(2400);
   });
 });

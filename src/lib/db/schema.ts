@@ -39,7 +39,7 @@ export const drop = pgTable(
     designFileKey: text("design_file_key"),
     printFileKey: text("print_file_key"),
     mockupUrl: text("mockup_url"),
-    placement: json("placement").$type<{ x: number; y: number; scale: number }>(),
+    placement: json("placement").$type<{ x: number; y: number; scale: number; rotate: number }>(),
     firstSaleAt: timestamp("first_sale_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
