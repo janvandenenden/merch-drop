@@ -7,9 +7,10 @@ import { db } from "./db";
 import * as schema from "./db/schema";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+const trustedOrigins = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
 
 export const auth = betterAuth({
-  trustedOrigins: ["http://localhost:3000"],
+  trustedOrigins: [trustedOrigins],
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
