@@ -1,60 +1,133 @@
-import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
-import { stripe } from "@/lib/stripe";
-import { db } from "@/lib/db";
-import { user, drop } from "@/lib/db/schema";
+import { NextResponse } from "next/server"
+import { eq } from "drizzle-orm"
+import Stripe from "stripe"
+import { stripe } from "@/lib/stripe"
+import { db } from "@/lib/db"
+import { user, drop, order } from "@/lib/db/schema"
+import { submitOrder } from "@/lib/printful"
+import { getSignedUrl } from "@/lib/storage"
+import { BC3001_VARIANTS } from "@/lib/variants"
 
 export async function POST(request: Request) {
-  const body = await request.text();
-  const signature = request.headers.get("stripe-signature");
+  const body = await request.text()
+  const signature = request.headers.get("stripe-signature")
 
   if (!signature) {
-    return NextResponse.json({ error: "Missing signature" }, { status: 400 });
+    return NextResponse.json({ error: "Missing signature" }, { status: 400 })
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
   if (!webhookSecret) {
-    return NextResponse.json(
-      { error: "Webhook secret not configured" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 })
   }
 
-  let event: ReturnType<typeof stripe.webhooks.constructEvent>;
+  let event: ReturnType<typeof stripe.webhooks.constructEvent>
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
   } catch {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
   }
 
-  if (event.type !== "account.updated") {
-    return NextResponse.json({ received: true });
+  if (event.type === "account.updated") {
+    await handleAccountUpdated(event.data.object as Stripe.Account)
+    return NextResponse.json({ received: true })
   }
 
-  const account = event.data.object;
-  if (!account.charges_enabled) {
-    return NextResponse.json({ received: true });
+  if (event.type === "checkout.session.completed") {
+    await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session)
+    return NextResponse.json({ received: true })
   }
+
+  return NextResponse.json({ received: true })
+}
+
+async function handleAccountUpdated(account: Stripe.Account) {
+  if (!account.charges_enabled) return
 
   const [creator] = await db
     .select()
     .from(user)
     .where(eq(user.stripeAccountId, account.id))
-    .limit(1);
+    .limit(1)
 
-  if (!creator || creator.chargesEnabled) {
-    return NextResponse.json({ received: true });
+  if (!creator || creator.chargesEnabled) return
+
+  await db.update(user).set({ chargesEnabled: true }).where(eq(user.id, creator.id))
+}
+
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  const { dropId, size, address: addressJson, buyerName } = session.metadata ?? {}
+  if (!dropId || !size || !addressJson) return
+
+  const buyerEmail = session.customer_details?.email ?? ""
+  const totalCents = session.amount_total ?? 0
+
+  // Idempotency: skip if order already recorded
+  const existing = await db.query.order.findFirst({
+    where: eq(order.stripeSessionId, session.id),
+  })
+  if (existing) return
+
+  const record = await db.query.drop.findFirst({ where: eq(drop.id, dropId) })
+  if (!record) return
+
+  const shippingAddress = JSON.parse(addressJson) as {
+    name: string
+    address1: string
+    city: string
+    stateCode?: string
+    zip: string
+    countryCode: string
   }
 
-  await db
-    .update(user)
-    .set({ chargesEnabled: true })
-    .where(eq(user.id, creator.id));
+  const [newOrder] = await db
+    .insert(order)
+    .values({
+      dropId,
+      stripeSessionId: session.id,
+      status: "paid",
+      size,
+      shippingAddress,
+      buyerEmail,
+      totalCents,
+      markupCents: record.markupCents,
+    })
+    .returning()
 
-  await db
-    .update(drop)
-    .set({ status: "live", updatedAt: new Date() })
-    .where(and(eq(drop.userId, creator.id), eq(drop.status, "pre_live")));
+  // Mark first sale timestamp
+  if (!record.firstSaleAt) {
+    await db
+      .update(drop)
+      .set({ firstSaleAt: new Date(), updatedAt: new Date() })
+      .where(eq(drop.id, dropId))
+  }
 
-  return NextResponse.json({ received: true });
+  if (!record.printFileKey) return
+
+  const variantId = BC3001_VARIANTS[size]
+  if (!variantId) return
+
+  const printFileUrl = await getSignedUrl(record.printFileKey)
+
+  try {
+    const printfulOrder = await submitOrder({
+      recipient: {
+        name: buyerName ?? shippingAddress.name,
+        email: buyerEmail,
+        address1: shippingAddress.address1,
+        city: shippingAddress.city,
+        stateCode: shippingAddress.stateCode,
+        countryCode: shippingAddress.countryCode,
+        zip: shippingAddress.zip,
+      },
+      items: [{ variantId, quantity: 1, printFileUrl }],
+    })
+
+    await db
+      .update(order)
+      .set({ status: "submitted", printfulOrderId: String(printfulOrder.id) })
+      .where(eq(order.id, newOrder.id))
+  } catch {
+    // Order stays as "paid" for manual review if Printful submission fails
+  }
 }

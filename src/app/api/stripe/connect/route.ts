@@ -20,6 +20,10 @@ export async function GET() {
     const account = await stripe.accounts.create({
       type: "express",
       email: currentUser.email,
+      capabilities: {
+        card_payments: { requested: true },
+        transfers: { requested: true },
+      },
     })
     stripeAccountId = account.id
 

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation"
 import { headers } from "next/headers"
-import { and, eq } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { stripe } from "@/lib/stripe"
 import { db } from "@/lib/db"
-import { user, drop } from "@/lib/db/schema"
+import { user } from "@/lib/db/schema"
 
 export async function GET() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -20,11 +20,6 @@ export async function GET() {
         .update(user)
         .set({ chargesEnabled: true })
         .where(eq(user.id, currentUser.id))
-
-      await db
-        .update(drop)
-        .set({ status: "live", updatedAt: new Date() })
-        .where(and(eq(drop.userId, currentUser.id), eq(drop.status, "pre_live")))
     }
   }
 

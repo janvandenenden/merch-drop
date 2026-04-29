@@ -14,7 +14,6 @@ import {
   CardDescription,
   CardAction,
   CardContent,
-  CardFooter,
 } from "@/components/ui/card"
 import type { Drop } from "@/lib/drops"
 
@@ -47,7 +46,6 @@ export default async function DashboardPage() {
 
   function renderDrop(drop: Drop) {
     const shareUrl = `${BASE_URL}/${user.slug}/${drop.slug}`
-    const showEnableCheckout = drop.status === "pre_live" && needsStripe
 
     return (
       <Card key={drop.id}>
@@ -72,15 +70,6 @@ export default async function DashboardPage() {
           )}
           <DropActions drop={drop} chargesEnabled={!!user.chargesEnabled} />
         </CardContent>
-
-        {showEnableCheckout && (
-          <CardFooter className="gap-3">
-            <p className="text-sm text-muted-foreground flex-1">
-              Connect Stripe to accept payments for this drop.
-            </p>
-            <Button size="sm" nativeButton={false} render={<a href="/api/stripe/connect" />}>Enable checkout</Button>
-          </CardFooter>
-        )}
       </Card>
     )
   }
@@ -100,6 +89,19 @@ export default async function DashboardPage() {
             <SignOutButton />
           </div>
         </div>
+
+        {needsStripe && (
+          <Card>
+            <CardContent className="flex items-center justify-between gap-4 py-4">
+              <p className="text-sm text-muted-foreground">
+                Connect Stripe to accept payments and go live with your drops.
+              </p>
+              <Button size="sm" nativeButton={false} render={<a href="/api/stripe/connect" />}>
+                Enable checkout
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {drops.length === 0 ? (
           <Card>
