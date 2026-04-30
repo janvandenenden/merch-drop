@@ -67,7 +67,7 @@ export default async function PublicDropPage({ params }: Props) {
   }
 
   const { buyerTotal } = calculatePrice(BASE_SHIRT_COST_CENTS, drop.markupCents)
-  const priceDisplay = `$${(buyerTotal / 100).toFixed(2)}`
+  const priceDisplay = `from $${(buyerTotal / 100).toFixed(2)} + shipping`
 
   return (
     <main className="flex min-h-screen items-center justify-center p-8">
@@ -99,7 +99,7 @@ export default async function PublicDropPage({ params }: Props) {
               <p className="text-2xl font-medium">{priceDisplay}</p>
             </div>
 
-            <BuyForm dropId={drop.id} priceDisplay={priceDisplay} />
+            <BuyForm dropId={drop.id} priceDisplay={priceDisplay} markupCents={drop.markupCents} />
 
             <div className="space-y-1 text-sm text-muted-foreground">
               <p>Printed &amp; shipped in 3–5 business days.</p>

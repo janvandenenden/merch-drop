@@ -6,7 +6,10 @@ const STRIPE_PERCENT = 0.029;
 const STRIPE_FIXED_CENTS = 30;
 
 export interface PriceBreakdown {
+  /** Stripe line item amount (excludes shipping, which Stripe adds separately) */
   buyerTotal: number;
+  /** Total the buyer pays: buyerTotal + shippingCents */
+  grandTotal: number;
   serviceFee: number;
   applicationFee: number;
   fulfillmentCents: number;
@@ -34,5 +37,5 @@ export function calculatePrice(
   const applicationFee = serviceFee + baseCents + shippingCents + stripeFee;
   const creatorNet = totalCharge - applicationFee;
 
-  return { buyerTotal, serviceFee, applicationFee, fulfillmentCents: baseCents, creatorNet };
+  return { buyerTotal, grandTotal: totalCharge, serviceFee, applicationFee, fulfillmentCents: baseCents, creatorNet };
 }

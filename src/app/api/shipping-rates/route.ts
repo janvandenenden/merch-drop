@@ -5,6 +5,8 @@ import { db } from "@/lib/db"
 import { drop } from "@/lib/db/schema"
 import { getShippingRates, estimateOrderCost, PrintfulError } from "@/lib/printful"
 import { BC3001_VARIANTS } from "@/lib/variants"
+import { getSignedUrl } from "@/lib/storage"
+import { BASE_SHIRT_COST_CENTS } from "@/lib/pricing"
 
 const bodySchema = z.object({
   dropId: z.string().uuid(),
@@ -38,6 +40,10 @@ export async function POST(request: Request) {
   if (!record || record.status !== "live") {
     return NextResponse.json({ error: "Drop not available" }, { status: 404 })
   }
+  if (!record.printFileKey) {
+    return NextResponse.json({ error: "Drop not available" }, { status: 404 })
+  }
+  const printFileUrl = await getSignedUrl(record.printFileKey)
 
   const variantId = BC3001_VARIANTS[size]
   if (!variantId) {
@@ -53,15 +59,30 @@ export async function POST(request: Request) {
   }
   const printfulItems = [{ variantId, quantity: 1 }]
 
+  let rates: Awaited<ReturnType<typeof getShippingRates>>
   try {
-    const [rates, fulfillmentCents] = await Promise.all([
-      getShippingRates(printfulAddress, printfulItems),
-      estimateOrderCost(printfulAddress, printfulItems),
-    ])
-    return NextResponse.json({ rates, fulfillmentCents })
+    rates = await getShippingRates(printfulAddress, printfulItems)
   } catch (err) {
-    const message =
-      err instanceof PrintfulError ? "Check your address and try again." : "Failed to fetch shipping rates."
+    if (err instanceof PrintfulError) {
+      console.error("[shipping-rates] getShippingRates failed", { code: err.code, reason: err.reason, message: err.message })
+    } else {
+      console.error("[shipping-rates] getShippingRates unexpected error", err)
+    }
+    const message = err instanceof PrintfulError ? "Check your address and try again." : "Failed to fetch shipping rates."
     return NextResponse.json({ error: message }, { status: 422 })
   }
+
+  let fulfillmentCents: number
+  try {
+    fulfillmentCents = await estimateOrderCost(printfulAddress, printfulItems, printFileUrl)
+  } catch (err) {
+    if (err instanceof PrintfulError) {
+      console.error("[shipping-rates] estimateOrderCost failed, falling back to base cost", { code: err.code, reason: err.reason, message: err.message })
+    } else {
+      console.error("[shipping-rates] estimateOrderCost unexpected error, falling back to base cost", err)
+    }
+    fulfillmentCents = BASE_SHIRT_COST_CENTS
+  }
+
+  return NextResponse.json({ rates, fulfillmentCents })
 }
