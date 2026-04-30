@@ -46,6 +46,7 @@ export function BuyForm({ dropId, priceDisplay }: BuyFormProps) {
   })
   const [rates, setRates] = useState<ShippingRate[]>([])
   const [selectedRateId, setSelectedRateId] = useState<string | null>(null)
+  const [fulfillmentCents, setFulfillmentCents] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -63,8 +64,12 @@ export function BuyForm({ dropId, priceDisplay }: BuyFormProps) {
     })
     setLoading(false)
     if (res.ok) {
-      const { rates: fetched } = (await res.json()) as { rates: ShippingRate[] }
+      const { rates: fetched, fulfillmentCents: cost } = (await res.json()) as {
+        rates: ShippingRate[]
+        fulfillmentCents: number
+      }
       setRates(fetched)
+      setFulfillmentCents(cost)
       setSelectedRateId(fetched[0]?.id ?? null)
       setStep("shipping")
     } else {
@@ -82,7 +87,7 @@ export function BuyForm({ dropId, priceDisplay }: BuyFormProps) {
     const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dropId, size, address, selectedRate }),
+      body: JSON.stringify({ dropId, size, address, selectedRate, fulfillmentCents }),
     })
     if (res.ok) {
       const { url } = (await res.json()) as { url: string }

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import {
   PrintfulError,
+  estimateOrderCost,
   generateMockup,
   getShippingRates,
   submitOrder,
@@ -60,6 +61,38 @@ describe.skipIf(!hasKey)("getShippingRates", () => {
         [{ variantId: BC3001_WHITE_M, quantity: 1 }],
       ),
     ).rejects.toBeInstanceOf(PrintfulError)
+  })
+})
+
+// ─── Order estimate ───────────────────────────────────────────────────────────
+
+describe.skipIf(!hasKey)("estimateOrderCost", () => {
+  it("returns a positive integer for a US address", async () => {
+    const cost = await estimateOrderCost(
+      {
+        address1: "1 Hacker Way",
+        city: "Menlo Park",
+        stateCode: "CA",
+        countryCode: "US",
+        zip: "94025",
+      },
+      [{ variantId: BC3001_WHITE_M, quantity: 1 }],
+    )
+    expect(typeof cost).toBe("number")
+    expect(Number.isInteger(cost)).toBe(true)
+    expect(cost).toBeGreaterThan(0)
+  })
+
+  it("returns a higher cost for an EU address (VAT applied)", async () => {
+    const usCost = await estimateOrderCost(
+      { address1: "1 Hacker Way", city: "Menlo Park", stateCode: "CA", countryCode: "US", zip: "94025" },
+      [{ variantId: BC3001_WHITE_M, quantity: 1 }],
+    )
+    const euCost = await estimateOrderCost(
+      { address1: "Nieuwezijds Voorburgwal 147", city: "Amsterdam", countryCode: "NL", zip: "1012 RJ" },
+      [{ variantId: BC3001_WHITE_M, quantity: 1 }],
+    )
+    expect(euCost).toBeGreaterThan(usCost)
   })
 })
 

@@ -3,7 +3,7 @@ import { z } from "zod"
 import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { drop } from "@/lib/db/schema"
-import { getShippingRates, PrintfulError } from "@/lib/printful"
+import { getShippingRates, estimateOrderCost, PrintfulError } from "@/lib/printful"
 import { BC3001_VARIANTS } from "@/lib/variants"
 
 const bodySchema = z.object({
@@ -44,18 +44,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid size" }, { status: 400 })
   }
 
+  const printfulAddress = {
+    address1: address.address1,
+    city: address.city,
+    stateCode: address.stateCode,
+    countryCode: address.countryCode,
+    zip: address.zip,
+  }
+  const printfulItems = [{ variantId, quantity: 1 }]
+
   try {
-    const rates = await getShippingRates(
-      {
-        address1: address.address1,
-        city: address.city,
-        stateCode: address.stateCode,
-        countryCode: address.countryCode,
-        zip: address.zip,
-      },
-      [{ variantId, quantity: 1 }],
-    )
-    return NextResponse.json({ rates })
+    const [rates, fulfillmentCents] = await Promise.all([
+      getShippingRates(printfulAddress, printfulItems),
+      estimateOrderCost(printfulAddress, printfulItems),
+    ])
+    return NextResponse.json({ rates, fulfillmentCents })
   } catch (err) {
     const message =
       err instanceof PrintfulError ? "Check your address and try again." : "Failed to fetch shipping rates."
