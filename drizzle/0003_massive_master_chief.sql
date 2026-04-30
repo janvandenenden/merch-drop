@@ -1,0 +1,1 @@
+ALTER TABLE "order" ADD COLUMN "tracking_number" text;

@@ -211,8 +211,8 @@ export async function generateMockup(
 
 const orderEstimateSchema = z.looseObject({
   costs: z.looseObject({
-    subtotal: z.string(),
-    vat: z.string(),
+    subtotal: z.union([z.string(), z.number()]).transform(String),
+    vat: z.union([z.string(), z.number()]).transform(String),
   }),
 })
 
