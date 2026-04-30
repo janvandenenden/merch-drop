@@ -9,9 +9,9 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-async function renderForm(priceDisplay = "$28.50") {
+async function renderForm(priceDisplay = "from $28.50", markupCents = 1500) {
   const { BuyForm } = await import("@/components/drops/buy-form")
-  render(<BuyForm dropId="drop-1" priceDisplay={priceDisplay} />)
+  render(<BuyForm dropId="drop-1" priceDisplay={priceDisplay} markupCents={markupCents} />)
 }
 
 const SHIPPING_RATES_RESPONSE = {
@@ -48,8 +48,8 @@ describe("BuyForm rendering", () => {
   })
 
   it("renders continue button with price on size step", async () => {
-    await renderForm("$28.50")
-    expect(screen.getByRole("button", { name: /continue.*\$28\.50/i })).toBeInTheDocument()
+    await renderForm("from $28.50 + shipping")
+    expect(screen.getByRole("button", { name: /continue.*from \$28\.50 \+ shipping/i })).toBeInTheDocument()
   })
 
   it("continue button is disabled before size is selected", async () => {

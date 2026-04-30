@@ -10,6 +10,9 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/db/schema", () => ({ drop: "drop-table" }))
 
+const mockGetSignedUrl = vi.fn()
+vi.mock("@/lib/storage", () => ({ getSignedUrl: mockGetSignedUrl }))
+
 const mockGetShippingRates = vi.fn()
 const mockEstimateOrderCost = vi.fn()
 vi.mock("@/lib/printful", () => ({
@@ -29,7 +32,8 @@ vi.mock("@/lib/printful", () => ({
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const DROP_ID = "123e4567-e89b-12d3-a456-426614174000"
-const DROP = { id: DROP_ID, status: "live" }
+const PRINT_FILE_URL = "https://example.com/print.png"
+const DROP = { id: DROP_ID, status: "live", printFileKey: "designs/test.png" }
 
 const RATES = [
   { id: "STANDARD", name: "Standard", rate: "5.99", currency: "USD", minDeliveryDays: 3, maxDeliveryDays: 5 },
@@ -64,6 +68,7 @@ function validBody(overrides?: Record<string, unknown>) {
 beforeEach(() => {
   vi.clearAllMocks()
   mockFindFirst.mockResolvedValue(DROP)
+  mockGetSignedUrl.mockResolvedValue(PRINT_FILE_URL)
   mockGetShippingRates.mockResolvedValue(RATES)
   mockEstimateOrderCost.mockResolvedValue(1350)
 })
@@ -145,6 +150,17 @@ describe("POST /api/shipping-rates", () => {
       expect(res.status).toBe(422)
       const json = await res.json()
       expect(json.error).toContain("shipping rates")
+    })
+
+    it("falls back to BASE_SHIRT_COST_CENTS when estimateOrderCost fails", async () => {
+      const { PrintfulError } = await import("@/lib/printful")
+      mockEstimateOrderCost.mockRejectedValue(new PrintfulError(404, "NotFound", "Not found"))
+      const { POST } = await import("@/app/api/shipping-rates/route")
+      const res = await POST(makeRequest(validBody()))
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json.rates).toEqual(RATES)
+      expect(json.fulfillmentCents).toBe(1200)
     })
   })
 })

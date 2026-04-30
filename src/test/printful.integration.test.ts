@@ -66,7 +66,7 @@ describe.skipIf(!hasKey)("getShippingRates", () => {
 
 // ─── Order estimate ───────────────────────────────────────────────────────────
 
-describe.skipIf(!hasKey)("estimateOrderCost", () => {
+describe.skipIf(!hasPrintFile)("estimateOrderCost", () => {
   it("returns a positive integer for a US address", async () => {
     const cost = await estimateOrderCost(
       {
@@ -77,6 +77,7 @@ describe.skipIf(!hasKey)("estimateOrderCost", () => {
         zip: "94025",
       },
       [{ variantId: BC3001_WHITE_M, quantity: 1 }],
+      printFileUrl,
     )
     expect(typeof cost).toBe("number")
     expect(Number.isInteger(cost)).toBe(true)
@@ -87,10 +88,12 @@ describe.skipIf(!hasKey)("estimateOrderCost", () => {
     const usCost = await estimateOrderCost(
       { address1: "1 Hacker Way", city: "Menlo Park", stateCode: "CA", countryCode: "US", zip: "94025" },
       [{ variantId: BC3001_WHITE_M, quantity: 1 }],
+      printFileUrl,
     )
     const euCost = await estimateOrderCost(
       { address1: "Nieuwezijds Voorburgwal 147", city: "Amsterdam", countryCode: "NL", zip: "1012 RJ" },
       [{ variantId: BC3001_WHITE_M, quantity: 1 }],
+      printFileUrl,
     )
     expect(euCost).toBeGreaterThan(usCost)
   })

@@ -21,9 +21,8 @@ describe("calculatePrice", () => {
 
   it("applicationFee = serviceFee + fulfillmentCents + shippingCents + stripeFee", () => {
     const shippingCents = 499;
-    const { buyerTotal, serviceFee, applicationFee, fulfillmentCents } = calculatePrice(1200, 500, shippingCents);
-    const totalCharge = buyerTotal + shippingCents;
-    const stripeFee = Math.round(totalCharge * STRIPE_PERCENT + STRIPE_FIXED);
+    const { grandTotal, serviceFee, applicationFee, fulfillmentCents } = calculatePrice(1200, 500, shippingCents);
+    const stripeFee = Math.round(grandTotal * STRIPE_PERCENT + STRIPE_FIXED);
     expect(applicationFee).toBe(serviceFee + fulfillmentCents + shippingCents + stripeFee);
   });
 
@@ -34,9 +33,8 @@ describe("calculatePrice", () => {
 
   it("platform nets serviceFee + baseCents + shippingCents after Stripe deducts its fee", () => {
     const shippingCents = 600;
-    const { buyerTotal, applicationFee, serviceFee, fulfillmentCents } = calculatePrice(1200, 800, shippingCents);
-    const totalCharge = buyerTotal + shippingCents;
-    const stripeFee = Math.round(totalCharge * STRIPE_PERCENT + STRIPE_FIXED);
+    const { grandTotal, applicationFee, serviceFee, fulfillmentCents } = calculatePrice(1200, 800, shippingCents);
+    const stripeFee = Math.round(grandTotal * STRIPE_PERCENT + STRIPE_FIXED);
     const platformNet = applicationFee - stripeFee;
     expect(platformNet).toBe(serviceFee + fulfillmentCents + shippingCents);
   });

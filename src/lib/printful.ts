@@ -219,21 +219,27 @@ const orderEstimateSchema = z.looseObject({
 export async function estimateOrderCost(
   address: ShippingAddress,
   items: ShippingItem[],
+  printFileUrl: string,
 ): Promise<number> {
   const result = await request(
-    "/orders/estimate",
+    "/orders/estimate-costs",
     orderEstimateSchema,
     {
       method: "POST",
       body: JSON.stringify({
         recipient: {
+          name: "Customer",
           address1: address.address1,
           city: address.city,
           state_code: address.stateCode,
           country_code: address.countryCode,
           zip: address.zip,
         },
-        items: items.map((i) => ({ variant_id: i.variantId, quantity: i.quantity })),
+        items: items.map((i) => ({
+          variant_id: i.variantId,
+          quantity: i.quantity,
+          files: [{ url: printFileUrl }],
+        })),
       }),
     },
   )
