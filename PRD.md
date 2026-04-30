@@ -109,7 +109,7 @@ BetterAuth magic link flow. User table extended with `slug` (unique creator user
 Creates connected account on "Enable checkout". Generates hosted onboarding link (incremental — `currently_due` only). Polls or webhooks for `charges_enabled` → sets `chargesEnabled: true` on user → transitions drop to `live`. One connected account per creator, reused across all drops.
 
 **Checkout**
-Creates Stripe Checkout session on "Buy now". Direct charge to creator's connected account. Platform application fee = service fee amount (covers 12% platform margin + Stripe processing). Fetches live shipping rates from Printful API and passes as Stripe shipping options. Requires buyer email.
+Creates Stripe Checkout session on "Buy now". Destination charge to creator's connected account via `transfer_data`. Platform sets `application_fee_amount = serviceFee + fulfillmentCents + shippingCents + stripeFee`, which allows the platform to pay Stripe, cover Printful fulfillment and shipping costs, and retain the 12% service fee — while the creator receives exactly their markup. Fetches live shipping rates from Printful API and passes as Stripe shipping options. Session metadata stores `fulfillmentCents` and `shippingCents` for downstream webhook use. Requires buyer email.
 
 **Stripe Webhooks**
 Handles `checkout.session.completed`: captures buyer info, creates order record, submits order to Printful. Handles Printful rejection: issues full refund from connected account, emails buyer and creator. All handlers idempotent.
@@ -151,12 +151,16 @@ BetterAuth user extended with: `slug` (unique), `stripeAccountId`, `chargesEnabl
 ### Pricing Formula
 
 ```
-serviceFee = grossUp(platformMargin + stripeProcessingFee)
-buyerTotal = printfulBase + creatorMarkup + serviceFee
-creatorNets = creatorMarkup (exactly)
+stripeFee       = (buyerTotal + shippingCents) × 2.9% + $0.30
+serviceFee      = buyerTotal × 12%
+applicationFee  = serviceFee + fulfillmentCents + shippingCents + stripeFee
+
+buyerTotal      = ceil((fulfillmentCents + markupCents + shippingCents × 2.9% + $0.30) / (1 − 12% − 2.9%))
+creatorNets     = markupCents (exactly)
+platformNets    = serviceFee + fulfillmentCents + shippingCents (after Stripe deducts its fee from applicationFee)
 ```
 
-Gross-up accounts for Stripe's percentage fee applying to the total charge amount.
+In Stripe destination charges, Stripe deducts its fee from the platform's `application_fee_amount`, not from the connected account. `applicationFee` is therefore set to include the Stripe fee so the platform can pay Stripe and still recover fulfillment + shipping costs. The gross-up formula inflates `buyerTotal` to ensure the creator nets exactly `markupCents` after all deductions. Shipping is added as a separate Stripe line item; the `shippingCents × 2.9%` term in the numerator compensates for Stripe's percentage applying to the combined total.
 
 ### URL Structure
 
@@ -164,7 +168,7 @@ Gross-up accounts for Stripe's percentage fee applying to the total charge amoun
 
 ### Refund Policy
 
-On Printful rejection: platform auto-issues full refund to buyer from creator's connected Stripe account. Stripe processing fee (~$1–2) is non-recoverable and comes out of creator's next payout. Creator is notified by email. Creator agrees to this at publish time via ToS checkbox.
+On Printful rejection: platform auto-issues full refund to buyer from creator's connected Stripe account. The Stripe processing fee is collected by the platform via `application_fee_amount` and is non-recoverable — it is absorbed by the platform, not the creator. Creator is notified by email. Creator agrees to this at publish time via ToS checkbox.
 
 ### Shirt
 

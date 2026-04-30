@@ -56,8 +56,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Drop not available" }, { status: 404 })
   }
 
-  const { buyerTotal, serviceFee } = calculatePrice(BASE_SHIRT_COST_CENTS, record.markupCents)
   const shippingAmountCents = Math.round(parseFloat(selectedRate.rate) * 100)
+  const { buyerTotal, applicationFee, fulfillmentCents } = calculatePrice(
+    BASE_SHIRT_COST_CENTS,
+    record.markupCents,
+    shippingAmountCents
+  )
 
   const baseUrl = process.env.NEXT_PUBLIC_URL ?? "http://localhost:3000"
   const creatorSlug = creator.slug ?? creator.id
@@ -101,7 +105,7 @@ export async function POST(request: Request) {
     ],
     shipping_options: shippingRateData,
     payment_intent_data: {
-      application_fee_amount: serviceFee,
+      application_fee_amount: applicationFee,
       on_behalf_of: creator.stripeAccountId,
       transfer_data: { destination: creator.stripeAccountId },
     },
@@ -112,6 +116,8 @@ export async function POST(request: Request) {
       address: JSON.stringify(address),
       shippingRateId: selectedRate.id,
       shippingName: selectedRate.name,
+      fulfillmentCents: String(fulfillmentCents),
+      shippingCents: String(shippingAmountCents),
     },
     success_url: `${dropUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: dropUrl,

@@ -126,3 +126,43 @@ src/
 - **Stripe Connect:** each creator connects once; their account is reused for all drops. Platform takes 12% application fee.
 - **Price lock:** once a drop has its first sale, price and design are locked.
 - **Fulfillment:** `checkout.session.completed` webhook submits the order to Printful. Printful rejection triggers an automatic full refund.
+
+## Money flow
+
+Three parties: **buyer**, **platform** (us), **creator**.
+
+```
+Buyer pays:        buyerTotal (product) + shippingCents (shipping line)
+                   └─ total charge = buyerTotal + shippingCents
+
+Platform collects: applicationFee = serviceFee + fulfillmentCents + shippingCents + stripeFee
+  → pays Stripe:   stripeFee  (~2.9% of total charge + $0.30)
+  → pays Printful: fulfillmentCents + shippingCents  ($12 base + actual shipping)
+  → keeps:         serviceFee  (12% of buyerTotal)
+
+Creator receives:  total charge − applicationFee = markupCents (exactly what they set)
+```
+
+**Gross-up formula** (`src/lib/pricing.ts`): `buyerTotal` is inflated so the creator nets exactly `markupCents` after all deductions. The formula accounts for Stripe's percentage applying to the combined product + shipping total:
+
+```
+buyerTotal = ceil(
+  (fulfillmentCents + markupCents + shippingCents × 2.9% + $0.30)
+  / (1 − 12% − 2.9%)
+)
+```
+
+**Why `applicationFee` includes the Stripe fee:** in Stripe destination charges, Stripe deducts its processing fee from the platform's `application_fee_amount` — not from the connected account. The platform is therefore responsible for the Stripe fee and recoups it through the application fee. The creator's payout is never affected by Stripe fees.
+
+**Concrete example** — $8 markup, $6 shipping:
+
+| | Amount |
+|---|---|
+| Buyer pays (product) | $23.86 |
+| Buyer pays (shipping) | $6.00 |
+| **Buyer total** | **$29.86** |
+| Stripe fee | $1.17 |
+| Fulfillment (Printful) | $18.00 |
+| Service fee (platform) | $2.86 |
+| **Application fee** | **$22.03** |
+| **Creator receives** | **$7.83 ≈ $8.00** |
