@@ -59,14 +59,13 @@ export async function POST(request: Request) {
 
   const FULFILLMENT_MIN_CENTS = 800
   const FULFILLMENT_MAX_CENTS = 5000
-  const safeFulfillmentCents = Math.min(
-    Math.max(clientFulfillmentCents, FULFILLMENT_MIN_CENTS),
-    FULFILLMENT_MAX_CENTS,
-  )
+  if (clientFulfillmentCents < FULFILLMENT_MIN_CENTS || clientFulfillmentCents > FULFILLMENT_MAX_CENTS) {
+    return NextResponse.json({ error: "Invalid fulfillment cost" }, { status: 400 })
+  }
 
   const shippingAmountCents = Math.round(parseFloat(selectedRate.rate) * 100)
   const { buyerTotal, applicationFee, fulfillmentCents } = calculatePrice(
-    safeFulfillmentCents,
+    clientFulfillmentCents,
     record.markupCents,
     shippingAmountCents,
   )

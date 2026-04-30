@@ -143,17 +143,19 @@ describe("POST /api/checkout", () => {
     })
   })
 
-  describe("fulfillmentCents clamping", () => {
-    it("clamps fulfillmentCents below min (800) up to 800", async () => {
+  describe("fulfillmentCents validation", () => {
+    it("rejects fulfillmentCents below min (800) with 400", async () => {
       const { POST } = await import("@/app/api/checkout/route")
-      await POST(makeRequest(validBody({ fulfillmentCents: 100 })))
-      expect(mockCalculatePrice).toHaveBeenCalledWith(800, DROP.markupCents, expect.any(Number))
+      const res = await POST(makeRequest(validBody({ fulfillmentCents: 100 })))
+      expect(res.status).toBe(400)
+      expect(mockCalculatePrice).not.toHaveBeenCalled()
     })
 
-    it("clamps fulfillmentCents above max (5000) down to 5000", async () => {
+    it("rejects fulfillmentCents above max (5000) with 400", async () => {
       const { POST } = await import("@/app/api/checkout/route")
-      await POST(makeRequest(validBody({ fulfillmentCents: 9999 })))
-      expect(mockCalculatePrice).toHaveBeenCalledWith(5000, DROP.markupCents, expect.any(Number))
+      const res = await POST(makeRequest(validBody({ fulfillmentCents: 9999 })))
+      expect(res.status).toBe(400)
+      expect(mockCalculatePrice).not.toHaveBeenCalled()
     })
 
     it("passes fulfillmentCents unchanged when within valid range", async () => {
