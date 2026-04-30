@@ -207,6 +207,47 @@ export async function generateMockup(
   throw new PrintfulError(0, "timeout", "Mockup generation timed out after 60s")
 }
 
+// ─── Order estimate ───────────────────────────────────────────────────────────
+
+const orderEstimateSchema = z.looseObject({
+  costs: z.looseObject({
+    subtotal: z.string(),
+    vat: z.string(),
+  }),
+})
+
+export async function estimateOrderCost(
+  address: ShippingAddress,
+  items: ShippingItem[],
+  printFileUrl: string,
+): Promise<number> {
+  const result = await request(
+    "/orders/estimate-costs",
+    orderEstimateSchema,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        recipient: {
+          name: "Customer",
+          address1: address.address1,
+          city: address.city,
+          state_code: address.stateCode,
+          country_code: address.countryCode,
+          zip: address.zip,
+        },
+        items: items.map((i) => ({
+          variant_id: i.variantId,
+          quantity: i.quantity,
+          files: [{ url: printFileUrl }],
+        })),
+      }),
+    },
+  )
+  const subtotalCents = Math.round(parseFloat(result.costs.subtotal) * 100)
+  const vatCents = Math.round(parseFloat(result.costs.vat) * 100)
+  return subtotalCents + vatCents
+}
+
 // ─── Shipping rates ───────────────────────────────────────────────────────────
 
 const shippingRateSchema = z.looseObject({

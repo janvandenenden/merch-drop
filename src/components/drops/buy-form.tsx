@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { calculatePrice } from "@/lib/pricing"
 
 const SIZES = ["S", "M", "L", "XL", "2XL"] as const
 type Size = (typeof SIZES)[number]
@@ -31,9 +32,10 @@ interface ShippingRate {
 interface BuyFormProps {
   dropId: string
   priceDisplay: string
+  markupCents: number
 }
 
-export function BuyForm({ dropId, priceDisplay }: BuyFormProps) {
+export function BuyForm({ dropId, priceDisplay, markupCents }: BuyFormProps) {
   const [step, setStep] = useState<Step>("size")
   const [size, setSize] = useState<Size | null>(null)
   const [address, setAddress] = useState<Address>({
@@ -46,6 +48,7 @@ export function BuyForm({ dropId, priceDisplay }: BuyFormProps) {
   })
   const [rates, setRates] = useState<ShippingRate[]>([])
   const [selectedRateId, setSelectedRateId] = useState<string | null>(null)
+  const [fulfillmentCents, setFulfillmentCents] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -63,8 +66,12 @@ export function BuyForm({ dropId, priceDisplay }: BuyFormProps) {
     })
     setLoading(false)
     if (res.ok) {
-      const { rates: fetched } = (await res.json()) as { rates: ShippingRate[] }
+      const { rates: fetched, fulfillmentCents: cost } = (await res.json()) as {
+        rates: ShippingRate[]
+        fulfillmentCents: number
+      }
       setRates(fetched)
+      setFulfillmentCents(cost)
       setSelectedRateId(fetched[0]?.id ?? null)
       setStep("shipping")
     } else {
@@ -82,7 +89,7 @@ export function BuyForm({ dropId, priceDisplay }: BuyFormProps) {
     const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dropId, size, address, selectedRate }),
+      body: JSON.stringify({ dropId, size, address, selectedRate, fulfillmentCents }),
     })
     if (res.ok) {
       const { url } = (await res.json()) as { url: string }
@@ -200,9 +207,17 @@ export function BuyForm({ dropId, priceDisplay }: BuyFormProps) {
   // step === "shipping"
   const selectedRate = rates.find((r) => r.id === selectedRateId)
 
+  const baseGrandTotal =
+    fulfillmentCents !== null ? calculatePrice(fulfillmentCents, markupCents, 0).grandTotal : null
+
   function formatRate(rate: ShippingRate) {
-    const cents = Math.round(parseFloat(rate.rate) * 100)
-    const price = cents === 0 ? "Free" : `$${(cents / 100).toFixed(2)}`
+    const rawCents = Math.round(parseFloat(rate.rate) * 100)
+    let effectiveCents = rawCents
+    if (fulfillmentCents !== null && baseGrandTotal !== null) {
+      const { grandTotal } = calculatePrice(fulfillmentCents, markupCents, rawCents)
+      effectiveCents = grandTotal - baseGrandTotal
+    }
+    const price = effectiveCents === 0 ? "Free" : `$${(effectiveCents / 100).toFixed(2)}`
     const days =
       rate.minDeliveryDays != null
         ? ` · ${rate.minDeliveryDays}–${rate.maxDeliveryDays ?? rate.minDeliveryDays} days`
@@ -210,9 +225,12 @@ export function BuyForm({ dropId, priceDisplay }: BuyFormProps) {
     return { price, days }
   }
 
-  const shippingDisplay = selectedRate
-    ? ` + $${(Math.round(parseFloat(selectedRate.rate) * 100) / 100).toFixed(2)} shipping`
-    : ""
+  const buyerTotalDisplay = (() => {
+    if (!selectedRate || fulfillmentCents === null) return priceDisplay
+    const shippingCents = Math.round(parseFloat(selectedRate.rate) * 100)
+    const { grandTotal } = calculatePrice(fulfillmentCents, markupCents, shippingCents)
+    return `$${(grandTotal / 100).toFixed(2)}`
+  })()
 
   return (
     <div className="flex flex-col gap-4">
@@ -252,7 +270,7 @@ export function BuyForm({ dropId, priceDisplay }: BuyFormProps) {
           Back
         </Button>
         <Button disabled={!selectedRateId || loading} onClick={handleBuy} className="flex-1">
-          {loading ? "Redirecting…" : `Buy — ${priceDisplay}${shippingDisplay}`}
+          {loading ? "Redirecting…" : `Buy — ${buyerTotalDisplay}`}
         </Button>
       </div>
     </div>

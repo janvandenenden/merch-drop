@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { drop, user } from "@/lib/db/schema"
 import { stripe } from "@/lib/stripe"
-import { calculatePrice, BASE_SHIRT_COST_CENTS } from "@/lib/pricing"
+import { calculatePrice } from "@/lib/pricing"
 
 const addressSchema = z.object({
   name: z.string().min(1),
@@ -29,6 +29,7 @@ const bodySchema = z.object({
   size: z.enum(["S", "M", "L", "XL", "2XL"]),
   address: addressSchema,
   selectedRate: selectedRateSchema,
+  fulfillmentCents: z.number().int(),
 })
 
 export async function POST(request: Request) {
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 })
   }
 
-  const { dropId, size, address, selectedRate } = parsed.data
+  const { dropId, size, address, selectedRate, fulfillmentCents: clientFulfillmentCents } = parsed.data
 
   const record = await db.query.drop.findFirst({ where: eq(drop.id, dropId) })
   if (!record || record.status !== "live") {
@@ -56,8 +57,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Drop not available" }, { status: 404 })
   }
 
-  const { buyerTotal, serviceFee } = calculatePrice(BASE_SHIRT_COST_CENTS, record.markupCents)
+  const FULFILLMENT_MIN_CENTS = 800
+  const FULFILLMENT_MAX_CENTS = 5000
+  if (clientFulfillmentCents < FULFILLMENT_MIN_CENTS || clientFulfillmentCents > FULFILLMENT_MAX_CENTS) {
+    return NextResponse.json({ error: "Invalid fulfillment cost" }, { status: 400 })
+  }
+
   const shippingAmountCents = Math.round(parseFloat(selectedRate.rate) * 100)
+  const { buyerTotal, applicationFee, fulfillmentCents } = calculatePrice(
+    clientFulfillmentCents,
+    record.markupCents,
+    shippingAmountCents,
+  )
 
   const baseUrl = process.env.NEXT_PUBLIC_URL ?? "http://localhost:3000"
   const creatorSlug = creator.slug ?? creator.id
@@ -101,7 +112,7 @@ export async function POST(request: Request) {
     ],
     shipping_options: shippingRateData,
     payment_intent_data: {
-      application_fee_amount: serviceFee,
+      application_fee_amount: applicationFee,
       on_behalf_of: creator.stripeAccountId,
       transfer_data: { destination: creator.stripeAccountId },
     },
@@ -112,6 +123,8 @@ export async function POST(request: Request) {
       address: JSON.stringify(address),
       shippingRateId: selectedRate.id,
       shippingName: selectedRate.name,
+      fulfillmentCents: String(fulfillmentCents),
+      shippingCents: String(shippingAmountCents),
     },
     success_url: `${dropUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: dropUrl,

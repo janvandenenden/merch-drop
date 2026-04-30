@@ -57,7 +57,7 @@ async function handleAccountUpdated(account: Stripe.Account) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const { dropId, size, address: addressJson, buyerName } = session.metadata ?? {}
+  const { dropId, size, address: addressJson, buyerName, fulfillmentCents, shippingCents } = session.metadata ?? {}
   if (!dropId || !size || !addressJson) return
 
   const buyerEmail = session.customer_details?.email ?? ""
@@ -92,6 +92,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       buyerEmail,
       totalCents,
       markupCents: record.markupCents,
+      fulfillmentCents: Number(fulfillmentCents ?? 0),
+      shippingCents: Number(shippingCents ?? 0),
     })
     .returning()
 
