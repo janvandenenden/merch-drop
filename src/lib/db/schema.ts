@@ -60,6 +60,8 @@ export const order = pgTable("order", {
   buyerEmail: text("buyer_email").notNull(),
   totalCents: integer("total_cents").notNull(),
   markupCents: integer("markup_cents").notNull(),
+  fulfillmentCents: integer("fulfillment_cents").notNull(),
+  shippingCents: integer("shipping_cents").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

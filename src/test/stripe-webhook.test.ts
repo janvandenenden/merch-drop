@@ -14,6 +14,7 @@ vi.mock("@/lib/stripe", () => ({
 const mockFindFirstOrder = vi.fn()
 const mockFindFirstDrop = vi.fn()
 const mockInsertOrder = vi.fn()
+const mockInsertValues = vi.fn()
 const mockUpdateDrop = vi.fn()
 const mockUpdateOrder = vi.fn()
 const mockSelectUser = vi.fn()
@@ -24,7 +25,7 @@ vi.mock("@/lib/db", () => ({
       order: { findFirst: mockFindFirstOrder },
       drop: { findFirst: mockFindFirstDrop },
     },
-    insert: () => ({ values: () => ({ returning: mockInsertOrder }) }),
+    insert: () => ({ values: mockInsertValues }),
     update: (table: unknown) => ({
       set: () => ({
         where: table === "order-table" ? mockUpdateOrder : mockUpdateDrop,
@@ -68,6 +69,8 @@ const SESSION = {
     size: "M",
     buyerName: "Jane Doe",
     address: JSON.stringify(ADDRESS),
+    fulfillmentCents: "1200",
+    shippingCents: "800",
   },
 }
 
@@ -105,6 +108,7 @@ beforeEach(() => {
 
   mockFindFirstOrder.mockResolvedValue(null)
   mockFindFirstDrop.mockResolvedValue(DROP_RECORD)
+  mockInsertValues.mockReturnValue({ returning: mockInsertOrder })
   mockInsertOrder.mockResolvedValue([NEW_ORDER])
   mockUpdateDrop.mockResolvedValue(undefined)
   mockUpdateOrder.mockResolvedValue(undefined)
@@ -126,7 +130,9 @@ describe("POST /api/stripe/webhook", () => {
       const res = await POST(makeWebhookRequest("checkout.session.completed"))
 
       expect(res.status).toBe(200)
-      expect(mockInsertOrder).toHaveBeenCalled()
+      expect(mockInsertValues).toHaveBeenCalledWith(
+        expect.objectContaining({ fulfillmentCents: 1200, shippingCents: 800 }),
+      )
       expect(mockSubmitOrder).toHaveBeenCalledWith(
         expect.objectContaining({
           recipient: expect.objectContaining({ email: "buyer@example.com" }),
