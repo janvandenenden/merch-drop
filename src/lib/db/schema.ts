@@ -54,6 +54,7 @@ export const order = pgTable("order", {
   dropId: uuid("drop_id").notNull(),
   stripeSessionId: text("stripe_session_id").notNull().unique(),
   printfulOrderId: text("printful_order_id"),
+  trackingNumber: text("tracking_number"),
   status: orderStatusEnum("status").notNull().default("pending"),
   size: text("size").notNull(),
   shippingAddress: json("shipping_address").notNull(),
