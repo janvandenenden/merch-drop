@@ -9,9 +9,9 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-async function renderForm(priceDisplay = "from $28.50", markupCents = 1500) {
+async function renderForm(productPriceCents = 3405) {
   const { BuyForm } = await import("@/components/drops/buy-form")
-  render(<BuyForm dropId="drop-1" priceDisplay={priceDisplay} markupCents={markupCents} />)
+  render(<BuyForm dropId="drop-1" productPriceCents={productPriceCents} />)
 }
 
 const SHIPPING_RATES_RESPONSE = {
@@ -54,9 +54,9 @@ describe("BuyForm rendering", () => {
     }
   })
 
-  it("shows the Stripe-included starting price on the details step", async () => {
-    await renderForm("from $28.50 + shipping")
-    expect(screen.getByText("from $28.50 + shipping")).toBeInTheDocument()
+  it("shows the fixed product price on the details step", async () => {
+    await renderForm(2850)
+    expect(screen.getByText("$28.50 + shipping")).toBeInTheDocument()
   })
 
   it("calculate shipping button is disabled before size and address are entered", async () => {
@@ -123,6 +123,14 @@ describe("shipping step", () => {
     expect(screen.getAllByText("$5.99")).toHaveLength(2)
     expect(screen.getByText("Total")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /buy.*\$40\.04/i })).toBeInTheDocument()
+  })
+
+  it("product price on step 2 matches step 1", async () => {
+    await renderForm(3405)
+    expect(screen.getByText("$34.05 + shipping")).toBeInTheDocument()
+    await goToShippingStep()
+    // step 1 unmounts; product row in breakdown must show the same price
+    expect(screen.getByText("$34.05")).toBeInTheDocument()
   })
 
   it("calls /api/shipping-rates with address and size", async () => {

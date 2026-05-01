@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculatePrice } from "../lib/pricing";
+import { calculatePrice, fixedProductPrice, computeApplicationFee } from "../lib/pricing";
 
 const STRIPE_PERCENT = 0.029;
 const STRIPE_FIXED = 30;
@@ -67,5 +67,49 @@ describe("calculatePrice", () => {
     const a = calculatePrice(1200, 600, 0);
     const b = calculatePrice(1200, 600);
     expect(a).toEqual(b);
+  });
+});
+
+describe("fixedProductPrice", () => {
+  it("returns an integer", () => {
+    expect(Number.isInteger(fixedProductPrice(800))).toBe(true);
+  });
+
+  it("is stable — same result regardless of shipping", () => {
+    const price = fixedProductPrice(1000);
+    expect(price).toBe(fixedProductPrice(1000));
+  });
+
+  it("increases with higher markupCents", () => {
+    expect(fixedProductPrice(1000)).toBeGreaterThan(fixedProductPrice(500));
+  });
+
+  it("is greater than BASE_SHIRT_COST_CENTS + markupCents (gross-up adds fees)", () => {
+    const price = fixedProductPrice(800);
+    expect(price).toBeGreaterThan(1200 + 800);
+  });
+});
+
+describe("computeApplicationFee", () => {
+  it("applicationFee = serviceFee + fulfillmentCents + shippingCents + stripeFee", () => {
+    const productPriceCents = 3200;
+    const fulfillmentCents = 1350;
+    const shippingCents = 599;
+    const { applicationFee, serviceFee } = computeApplicationFee(productPriceCents, fulfillmentCents, shippingCents);
+    const stripeFee = Math.round((productPriceCents + shippingCents) * STRIPE_PERCENT + STRIPE_FIXED);
+    expect(applicationFee).toBe(serviceFee + fulfillmentCents + shippingCents + stripeFee);
+  });
+
+  it("creatorNet = (productPriceCents + shippingCents) - applicationFee", () => {
+    const productPriceCents = 3000;
+    const { applicationFee, creatorNet } = computeApplicationFee(productPriceCents, 1200, 500);
+    expect(creatorNet).toBe(productPriceCents + 500 - applicationFee);
+  });
+
+  it("returns integers", () => {
+    const { applicationFee, serviceFee, creatorNet } = computeApplicationFee(3000, 1200, 500);
+    expect(Number.isInteger(applicationFee)).toBe(true);
+    expect(Number.isInteger(serviceFee)).toBe(true);
+    expect(Number.isInteger(creatorNet)).toBe(true);
   });
 });
