@@ -3,11 +3,10 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP } from "better-auth/plugins/email-otp";
 import { nextCookies } from "better-auth/next-js";
 import { dash } from "@better-auth/infra";
-import { Resend } from "resend";
 import { db } from "./db";
 import * as schema from "./db/schema";
+import { sendEmail, EMAIL_FROM } from "./email";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const trustedOrigins = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
 
 export const auth = betterAuth({
@@ -41,8 +40,8 @@ export const auth = betterAuth({
           type === "sign-in"
             ? "Your Merch Drop login code"
             : "Verify your email";
-        const result = await resend.emails.send({
-          from: "Merch Drop <noreply@resend.dev>",
+        await sendEmail({
+          from: EMAIL_FROM,
           to: email,
           subject,
           text: `Your verification code is: ${otp}\n\nExpires in 5 minutes.`,
