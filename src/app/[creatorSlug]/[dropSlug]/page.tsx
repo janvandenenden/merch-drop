@@ -96,7 +96,6 @@ export default async function PublicDropPage({ params }: Props) {
               {drop.description && (
                 <p className="text-muted-foreground">{drop.description}</p>
               )}
-              <p className="text-2xl font-medium">{priceDisplay}</p>
             </div>
 
             <BuyForm dropId={drop.id} priceDisplay={priceDisplay} markupCents={drop.markupCents} />
