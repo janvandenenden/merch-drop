@@ -4,8 +4,6 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { calculatePrice } from "@/lib/pricing"
-
 const SIZES = ["S", "M", "L", "XL", "2XL"] as const
 type Size = (typeof SIZES)[number]
 
@@ -31,15 +29,14 @@ interface ShippingRate {
 
 interface BuyFormProps {
   dropId: string
-  priceDisplay: string
-  markupCents: number
+  productPriceCents: number
 }
 
 function formatCents(cents: number) {
   return `$${(cents / 100).toFixed(2)}`
 }
 
-export function BuyForm({ dropId, priceDisplay, markupCents }: BuyFormProps) {
+export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
   const [step, setStep] = useState<Step>("details")
   const [size, setSize] = useState<Size | null>(null)
   const [isEditingSize, setIsEditingSize] = useState(true)
@@ -127,7 +124,7 @@ export function BuyForm({ dropId, priceDisplay, markupCents }: BuyFormProps) {
       >
         <div className="rounded-md bg-muted/40 px-4 py-3">
           <p className="text-sm text-muted-foreground">Product</p>
-          <p className="text-lg font-semibold">{priceDisplay}</p>
+          <p className="text-lg font-semibold">{formatCents(productPriceCents)} + shipping</p>
         </div>
         <div className="rounded-md border border-border">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
@@ -266,15 +263,12 @@ export function BuyForm({ dropId, priceDisplay, markupCents }: BuyFormProps) {
   }
 
   const priceBreakdown = (() => {
-    if (!selectedRate || fulfillmentCents === null) return null
+    if (!selectedRate) return null
     const shippingCents = Math.round(parseFloat(selectedRate.rate) * 100)
-    return {
-      shippingCents,
-      ...calculatePrice(fulfillmentCents, markupCents, shippingCents),
-    }
+    return { shippingCents, grandTotal: productPriceCents + shippingCents }
   })()
 
-  const buyTotalDisplay = priceBreakdown ? formatCents(priceBreakdown.grandTotal) : priceDisplay
+  const buyTotalDisplay = priceBreakdown ? formatCents(priceBreakdown.grandTotal) : formatCents(productPriceCents)
 
   return (
     <div className="flex flex-col gap-4">
@@ -305,7 +299,7 @@ export function BuyForm({ dropId, priceDisplay, markupCents }: BuyFormProps) {
         <div className="rounded-md border border-border bg-muted/30 p-4 text-sm">
           <div className="flex items-center justify-between gap-3">
             <span className="text-muted-foreground">Product</span>
-            <span className="font-medium">{formatCents(priceBreakdown.buyerTotal)}</span>
+            <span className="font-medium">{formatCents(productPriceCents)}</span>
           </div>
           <div className="mt-2 flex items-center justify-between gap-3">
             <span className="text-muted-foreground">Shipping</span>

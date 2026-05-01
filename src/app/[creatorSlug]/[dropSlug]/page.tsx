@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 import Image from "next/image"
 import { getDropBySlug } from "@/lib/drops"
 import { getSignedUrl } from "@/lib/storage"
-import { calculatePrice, BASE_SHIRT_COST_CENTS } from "@/lib/pricing"
+import { fixedProductPrice } from "@/lib/pricing"
 import { BuyForm } from "@/components/drops/buy-form"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 
@@ -66,8 +66,7 @@ export default async function PublicDropPage({ params }: Props) {
     )
   }
 
-  const { buyerTotal } = calculatePrice(BASE_SHIRT_COST_CENTS, drop.markupCents)
-  const priceDisplay = `from $${(buyerTotal / 100).toFixed(2)} + shipping`
+  const productPriceCents = fixedProductPrice(drop.markupCents)
 
   return (
     <main className="flex min-h-screen items-center justify-center p-8">
@@ -98,7 +97,7 @@ export default async function PublicDropPage({ params }: Props) {
               )}
             </div>
 
-            <BuyForm dropId={drop.id} priceDisplay={priceDisplay} markupCents={drop.markupCents} />
+            <BuyForm dropId={drop.id} productPriceCents={productPriceCents} />
 
             <div className="space-y-1 text-sm text-muted-foreground">
               <p>Printed &amp; shipped in 3–5 business days.</p>

@@ -39,3 +39,39 @@ export function calculatePrice(
 
   return { buyerTotal, grandTotal: totalCharge, serviceFee, applicationFee, fulfillmentCents: baseCents, creatorNet };
 }
+
+/** Fixed buyer-facing product price computed from base cost only — no shipping influence. */
+export function fixedProductPrice(markupCents: number): number {
+  return Math.ceil(
+    (BASE_SHIRT_COST_CENTS + markupCents + STRIPE_FIXED_CENTS) /
+      (1 - PLATFORM_FEE_RATE - STRIPE_PERCENT)
+  );
+}
+
+/** Inverse of fixedProductPrice — derive markupCents from a desired sale price. */
+export function salePriceToMarkupCents(salePriceCents: number): number {
+  return Math.max(
+    0,
+    Math.floor(salePriceCents * (1 - PLATFORM_FEE_RATE - STRIPE_PERCENT) - BASE_SHIRT_COST_CENTS - STRIPE_FIXED_CENTS),
+  );
+}
+
+export interface ApplicationFeeBreakdown {
+  applicationFee: number;
+  serviceFee: number;
+  creatorNet: number;
+}
+
+/** Internal fee accounting after product price is fixed. Creator net may differ slightly from markupCents. */
+export function computeApplicationFee(
+  productPriceCents: number,
+  fulfillmentCents: number,
+  shippingCents: number,
+): ApplicationFeeBreakdown {
+  const totalCharge = productPriceCents + shippingCents;
+  const stripeFee = Math.round(totalCharge * STRIPE_PERCENT + STRIPE_FIXED_CENTS);
+  const serviceFee = Math.round(productPriceCents * PLATFORM_FEE_RATE);
+  const applicationFee = serviceFee + fulfillmentCents + shippingCents + stripeFee;
+  const creatorNet = totalCharge - applicationFee;
+  return { applicationFee, serviceFee, creatorNet };
+}

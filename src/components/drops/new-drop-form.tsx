@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { calculatePrice, BASE_SHIRT_COST_CENTS } from "@/lib/pricing"
+import { fixedProductPrice, salePriceToMarkupCents, computeApplicationFee, BASE_SHIRT_COST_CENTS } from "@/lib/pricing"
 
 function toSlug(title: string): string {
   return title
@@ -39,7 +39,7 @@ const schema = z.object({
     .regex(/^[a-z0-9-]+$/, "Lowercase letters, numbers, and hyphens only"),
   description: z.string().optional(),
   supportEmail: z.string().email("Enter a valid email address"),
-  markupDollars: z.number().min(0, "Must be 0 or more"),
+  salePriceDollars: z.number().min(0.01, "Must be greater than 0"),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -58,11 +58,11 @@ export function NewDropForm({ creatorSlug }: { creatorSlug: string }) {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { markupDollars: 10, slug: "", title: "" },
+    defaultValues: { salePriceDollars: 35, slug: "", title: "" },
   })
 
   const title = watch("title")
-  const markupDollars = watch("markupDollars")
+  const salePriceDollars = watch("salePriceDollars")
 
   useEffect(() => {
     if (!slugEdited && title) {
@@ -71,8 +71,10 @@ export function NewDropForm({ creatorSlug }: { creatorSlug: string }) {
     }
   }, [title, slugEdited, setValue])
 
-  const markupCents = Math.round((markupDollars || 0) * 100)
-  const price = calculatePrice(BASE_SHIRT_COST_CENTS, markupCents)
+  const salePriceCents = Math.round((salePriceDollars || 0) * 100)
+  const markupCents = salePriceToMarkupCents(salePriceCents)
+  const actualSalePriceCents = fixedProductPrice(markupCents)
+  const { creatorNet } = computeApplicationFee(actualSalePriceCents, BASE_SHIRT_COST_CENTS, 0)
 
   async function onSubmit(values: FormValues) {
     setServerError(null)
@@ -84,7 +86,7 @@ export function NewDropForm({ creatorSlug }: { creatorSlug: string }) {
         slug: values.slug,
         description: values.description,
         supportEmail: values.supportEmail,
-        markupCents: Math.round(values.markupDollars * 100),
+        markupCents: salePriceToMarkupCents(Math.round(values.salePriceDollars * 100)),
       }),
     })
 
@@ -174,17 +176,17 @@ export function NewDropForm({ creatorSlug }: { creatorSlug: string }) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="markupDollars">Your markup</Label>
+        <Label htmlFor="salePriceDollars">Sale price</Label>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">$</span>
           <Controller
-            name="markupDollars"
+            name="salePriceDollars"
             control={control}
             render={({ field }) => (
               <Input
-                id="markupDollars"
+                id="salePriceDollars"
                 type="number"
-                min={0}
+                min={0.01}
                 step={0.01}
                 className="w-32"
                 value={field.value}
@@ -195,37 +197,23 @@ export function NewDropForm({ creatorSlug }: { creatorSlug: string }) {
             )}
           />
         </div>
-        {errors.markupDollars && (
+        <p className="text-xs text-muted-foreground">What the buyer pays for the shirt, before shipping.</p>
+        {errors.salePriceDollars && (
           <p className="text-sm text-destructive">
-            {errors.markupDollars.message}
+            {errors.salePriceDollars.message}
           </p>
         )}
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Price breakdown</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Shirt cost</span>
-            <span>${formatCents(BASE_SHIRT_COST_CENTS)}</span>
+        <CardContent className="flex items-center justify-between pt-6 text-sm">
+          <div>
+            <p className="text-muted-foreground">Sale price</p>
+            <p className="text-lg font-semibold">${formatCents(actualSalePriceCents)}</p>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Your markup</span>
-            <span>${formatCents(markupCents)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Service fee</span>
-            <span>${formatCents(price.serviceFee)}</span>
-          </div>
-          <div className="flex justify-between border-t pt-2 font-medium">
-            <span>Buyer pays</span>
-            <span>${formatCents(price.buyerTotal)}</span>
-          </div>
-          <div className="flex justify-between text-green-600 dark:text-green-400">
-            <span>You earn</span>
-            <span>${formatCents(price.creatorNet)}</span>
+          <div className="text-right">
+            <p className="text-muted-foreground">You earn per shirt</p>
+            <p className="text-lg font-semibold text-green-600 dark:text-green-400">~${formatCents(creatorNet)}</p>
           </div>
         </CardContent>
       </Card>

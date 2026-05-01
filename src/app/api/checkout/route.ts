@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { drop, user } from "@/lib/db/schema"
 import { stripe } from "@/lib/stripe"
-import { calculatePrice } from "@/lib/pricing"
+import { fixedProductPrice, computeApplicationFee } from "@/lib/pricing"
 
 const addressSchema = z.object({
   name: z.string().min(1),
@@ -64,11 +64,8 @@ export async function POST(request: Request) {
   }
 
   const shippingAmountCents = Math.round(parseFloat(selectedRate.rate) * 100)
-  const { buyerTotal, applicationFee, fulfillmentCents } = calculatePrice(
-    clientFulfillmentCents,
-    record.markupCents,
-    shippingAmountCents,
-  )
+  const productPriceCents = fixedProductPrice(record.markupCents)
+  const { applicationFee } = computeApplicationFee(productPriceCents, clientFulfillmentCents, shippingAmountCents)
 
   const baseUrl = process.env.NEXT_PUBLIC_URL ?? "http://localhost:3000"
   const creatorSlug = creator.slug ?? creator.id
@@ -104,7 +101,7 @@ export async function POST(request: Request) {
       {
         price_data: {
           currency: "usd",
-          unit_amount: buyerTotal,
+          unit_amount: productPriceCents,
           product_data: { name: record.title },
         },
         quantity: 1,
@@ -123,7 +120,7 @@ export async function POST(request: Request) {
       address: JSON.stringify(address),
       shippingRateId: selectedRate.id,
       shippingName: selectedRate.name,
-      fulfillmentCents: String(fulfillmentCents),
+      fulfillmentCents: String(clientFulfillmentCents),
       shippingCents: String(shippingAmountCents),
     },
     success_url: `${dropUrl}/success?session_id={CHECKOUT_SESSION_ID}`,

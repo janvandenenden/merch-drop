@@ -24,9 +24,11 @@ vi.mock("@/lib/stripe", () => ({
   stripe: { checkout: { sessions: { create: mockSessionsCreate } } },
 }))
 
-const mockCalculatePrice = vi.fn()
+const mockFixedProductPrice = vi.fn()
+const mockComputeApplicationFee = vi.fn()
 vi.mock("@/lib/pricing", () => ({
-  calculatePrice: mockCalculatePrice,
+  fixedProductPrice: mockFixedProductPrice,
+  computeApplicationFee: mockComputeApplicationFee,
 }))
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -94,10 +96,9 @@ beforeEach(() => {
 
   mockFindFirstDrop.mockResolvedValue(DROP)
   mockFindFirstUser.mockResolvedValue(CREATOR)
-  mockCalculatePrice.mockReturnValue({
-    buyerTotal: 2800,
+  mockFixedProductPrice.mockReturnValue(2800)
+  mockComputeApplicationFee.mockReturnValue({
     applicationFee: 500,
-    fulfillmentCents: 1350,
     serviceFee: 200,
     creatorNet: 1000,
   })
@@ -148,32 +149,32 @@ describe("POST /api/checkout", () => {
       const { POST } = await import("@/app/api/checkout/route")
       const res = await POST(makeRequest(validBody({ fulfillmentCents: 100 })))
       expect(res.status).toBe(400)
-      expect(mockCalculatePrice).not.toHaveBeenCalled()
+      expect(mockComputeApplicationFee).not.toHaveBeenCalled()
     })
 
     it("rejects fulfillmentCents above max (5000) with 400", async () => {
       const { POST } = await import("@/app/api/checkout/route")
       const res = await POST(makeRequest(validBody({ fulfillmentCents: 9999 })))
       expect(res.status).toBe(400)
-      expect(mockCalculatePrice).not.toHaveBeenCalled()
+      expect(mockComputeApplicationFee).not.toHaveBeenCalled()
     })
 
     it("passes fulfillmentCents unchanged when within valid range", async () => {
       const { POST } = await import("@/app/api/checkout/route")
       await POST(makeRequest(validBody({ fulfillmentCents: 1350 })))
-      expect(mockCalculatePrice).toHaveBeenCalledWith(1350, DROP.markupCents, expect.any(Number))
+      expect(mockComputeApplicationFee).toHaveBeenCalledWith(expect.any(Number), 1350, expect.any(Number))
     })
 
     it("accepts boundary value of 800", async () => {
       const { POST } = await import("@/app/api/checkout/route")
       await POST(makeRequest(validBody({ fulfillmentCents: 800 })))
-      expect(mockCalculatePrice).toHaveBeenCalledWith(800, DROP.markupCents, expect.any(Number))
+      expect(mockComputeApplicationFee).toHaveBeenCalledWith(expect.any(Number), 800, expect.any(Number))
     })
 
     it("accepts boundary value of 5000", async () => {
       const { POST } = await import("@/app/api/checkout/route")
       await POST(makeRequest(validBody({ fulfillmentCents: 5000 })))
-      expect(mockCalculatePrice).toHaveBeenCalledWith(5000, DROP.markupCents, expect.any(Number))
+      expect(mockComputeApplicationFee).toHaveBeenCalledWith(expect.any(Number), 5000, expect.any(Number))
     })
   })
 
@@ -184,6 +185,21 @@ describe("POST /api/checkout", () => {
       expect(res.status).toBe(200)
       const json = await res.json()
       expect(json.url).toBe("https://checkout.stripe.com/session")
+    })
+
+    it("uses fixedProductPrice as Stripe line item unit_amount", async () => {
+      mockFixedProductPrice.mockReturnValue(3500)
+      const { POST } = await import("@/app/api/checkout/route")
+      await POST(makeRequest(validBody()))
+      expect(mockSessionsCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          line_items: expect.arrayContaining([
+            expect.objectContaining({
+              price_data: expect.objectContaining({ unit_amount: 3500 }),
+            }),
+          ]),
+        }),
+      )
     })
 
     it("stores fulfillmentCents in Stripe session metadata", async () => {
