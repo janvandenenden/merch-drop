@@ -15,7 +15,16 @@ async function renderForm(priceDisplay = "from $28.50", markupCents = 1500) {
 }
 
 const SHIPPING_RATES_RESPONSE = {
-  rates: [{ id: "STANDARD", name: "Standard", rate: "5.99", currency: "USD", minDeliveryDays: 3, maxDeliveryDays: 5 }],
+  rates: [
+    {
+      id: "STANDARD",
+      name: "Standard",
+      rate: "5.99",
+      currency: "USD",
+      minDeliveryDays: 3,
+      maxDeliveryDays: 5,
+    },
+  ],
   fulfillmentCents: 1350,
 }
 
@@ -25,15 +34,13 @@ async function goToShippingStep() {
   )
 
   await userEvent.click(screen.getByRole("button", { name: "L" }))
-  await userEvent.click(screen.getByRole("button", { name: /continue/i }))
-
   await userEvent.type(screen.getByLabelText("Full name"), "Jane Doe")
   await userEvent.type(screen.getByLabelText("Address"), "1 Main St")
   await userEvent.type(screen.getByLabelText("City"), "Portland")
   await userEvent.type(screen.getByLabelText("ZIP / Postal"), "97201")
   await userEvent.type(screen.getByLabelText("Country code"), "US")
 
-  await userEvent.click(screen.getByRole("button", { name: /get shipping rates/i }))
+  await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
   await screen.findByText(/standard/i)
 }
 
@@ -47,49 +54,52 @@ describe("BuyForm rendering", () => {
     }
   })
 
-  it("renders continue button with price on size step", async () => {
+  it("shows the Stripe-included starting price on the details step", async () => {
     await renderForm("from $28.50 + shipping")
-    expect(screen.getByRole("button", { name: /continue.*from \$28\.50 \+ shipping/i })).toBeInTheDocument()
+    expect(screen.getByText("from $28.50 + shipping")).toBeInTheDocument()
   })
 
-  it("continue button is disabled before size is selected", async () => {
+  it("calculate shipping button is disabled before size and address are entered", async () => {
     await renderForm()
-    expect(screen.getByRole("button", { name: /continue/i })).toBeDisabled()
+    expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
   })
 })
 
 // ─── Size selection ───────────────────────────────────────────────────────────
 
 describe("size selection", () => {
-  it("enables continue button after selecting a size", async () => {
+  it("keeps calculate shipping disabled after only selecting a size", async () => {
     await renderForm()
     await userEvent.click(screen.getByRole("button", { name: "M" }))
-    expect(screen.getByRole("button", { name: /continue/i })).not.toBeDisabled()
+    expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
   })
 
   it("can switch between sizes", async () => {
     await renderForm()
     await userEvent.click(screen.getByRole("button", { name: "M" }))
+    await userEvent.click(screen.getByRole("button", { name: "Change" }))
     await userEvent.click(screen.getByRole("button", { name: "XL" }))
-    expect(screen.getByRole("button", { name: /continue/i })).not.toBeDisabled()
+    expect(screen.getByText("XL")).toBeInTheDocument()
   })
 })
 
-// ─── Address step ─────────────────────────────────────────────────────────────
+// ─── Details step ─────────────────────────────────────────────────────────────
 
-describe("address step", () => {
-  it("advances to address step after selecting a size and clicking continue", async () => {
+describe("details step", () => {
+  it("lets the buyer enter an address before selecting a size", async () => {
     await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "M" }))
-    await userEvent.click(screen.getByRole("button", { name: /continue/i }))
+    expect(screen.getByRole("button", { name: "M" })).toBeInTheDocument()
+    expect(screen.queryByLabelText("Full name")).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole("button", { name: "Add" }))
+
     expect(screen.getByLabelText("Full name")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Choose" })).toBeInTheDocument()
   })
 
-  it("get shipping rates button is disabled until required fields are filled", async () => {
+  it("calculate shipping button is disabled until required fields are filled", async () => {
     await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "M" }))
-    await userEvent.click(screen.getByRole("button", { name: /continue/i }))
-    expect(screen.getByRole("button", { name: /get shipping rates/i })).toBeDisabled()
+    expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
   })
 })
 
@@ -100,6 +110,19 @@ describe("shipping step", () => {
     await renderForm()
     await goToShippingStep()
     expect(screen.getByText(/standard/i)).toBeInTheDocument()
+    expect(screen.getAllByText("$5.99")).toHaveLength(2)
+  })
+
+  it("shows a Stripe-matching price breakdown", async () => {
+    await renderForm()
+    await goToShippingStep()
+
+    expect(screen.getByText("Product")).toBeInTheDocument()
+    expect(screen.getByText("$34.05")).toBeInTheDocument()
+    expect(screen.getByText("Shipping")).toBeInTheDocument()
+    expect(screen.getAllByText("$5.99")).toHaveLength(2)
+    expect(screen.getByText("Total")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /buy.*\$40\.04/i })).toBeInTheDocument()
   })
 
   it("calls /api/shipping-rates with address and size", async () => {
@@ -120,13 +143,12 @@ describe("shipping step", () => {
 
     await renderForm()
     await userEvent.click(screen.getByRole("button", { name: "L" }))
-    await userEvent.click(screen.getByRole("button", { name: /continue/i }))
     await userEvent.type(screen.getByLabelText("Full name"), "Jane Doe")
     await userEvent.type(screen.getByLabelText("Address"), "1 Main St")
     await userEvent.type(screen.getByLabelText("City"), "Portland")
     await userEvent.type(screen.getByLabelText("ZIP / Postal"), "97201")
     await userEvent.type(screen.getByLabelText("Country code"), "US")
-    await userEvent.click(screen.getByRole("button", { name: /get shipping rates/i }))
+    await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
 
     await screen.findByText("Check your address and try again.")
   })
