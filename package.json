@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "npx tsx --env-file=.env.local scripts/seed.ts",
-    "reset-stripe": "npx tsx --env-file=.env.local scripts/reset-stripe.ts"
+    "reset-stripe": "npx tsx --env-file=.env.local scripts/reset-stripe.ts",
+    "migrate": "npx tsx --env-file=.env.local scripts/migrate.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",
