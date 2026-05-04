@@ -25,6 +25,16 @@ export const orderStatusEnum = pgEnum("order_status", [
   "cancelled",
 ]);
 
+type OrderStatus = (typeof orderStatusEnum.enumValues)[number];
+
+export const ORDER_TRANSITIONS = {
+  pending:   ["paid", "cancelled"],
+  paid:      ["submitted", "cancelled"],
+  submitted: ["shipped", "cancelled"],
+  shipped:   [],
+  cancelled: [],
+} satisfies Record<OrderStatus, OrderStatus[]>;
+
 export const drop = pgTable(
   "drop",
   {
@@ -63,6 +73,11 @@ export const order = pgTable("order", {
   markupCents: integer("markup_cents").notNull(),
   fulfillmentCents: integer("fulfillment_cents").notNull(),
   shippingCents: integer("shipping_cents").notNull(),
+  cancellationReason: text("cancellation_reason"),
+  cancelledAt: timestamp("cancelled_at"),
+  refundedAt: timestamp("refunded_at"),
+  confirmationEmailSentAt: timestamp("confirmation_email_sent_at"),
+  shippingEmailSentAt: timestamp("shipping_email_sent_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

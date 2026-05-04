@@ -73,10 +73,9 @@ describe("POST /api/webhooks/printful", () => {
 
     expect(res.status).toBe(200)
     expect(mockFindFirstOrder).toHaveBeenCalled()
-    expect(mockUpdateSet).toHaveBeenCalledWith({
-      status: "shipped",
-      trackingNumber: "0000000000",
-    })
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "shipped", trackingNumber: "0000000000" }),
+    )
   })
 
   it("does not update again when the shipment was already recorded", async () => {

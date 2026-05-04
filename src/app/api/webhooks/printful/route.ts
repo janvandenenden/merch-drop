@@ -88,6 +88,6 @@ async function handlePackageShipped(payload: z.infer<typeof packageShippedSchema
 
   await db
     .update(order)
-    .set({ status: "shipped", trackingNumber })
+    .set({ status: "shipped", trackingNumber, shippingEmailSentAt: new Date() })
     .where(eq(order.id, existingOrder.id))
 }

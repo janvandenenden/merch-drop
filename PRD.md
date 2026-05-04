@@ -143,8 +143,14 @@ Two app-owned tables (BetterAuth owns auth tables):
 - id, dropId, stripeSessionId (unique), printfulOrderId
 - status (pending | paid | submitted | shipped | cancelled)
 - size, shippingAddress (JSON), buyerEmail
-- totalCents, markupCents
+- totalCents, markupCents, fulfillmentCents, shippingCents
+- cancellationReason (text, nullable), cancelledAt (timestamp, nullable)
+- refundedAt (timestamp, nullable) — set only when refund API call succeeds
+- confirmationEmailSentAt (timestamp, nullable) — set when order submitted to Printful
+- shippingEmailSentAt (timestamp, nullable) — set when package_shipped webhook fires
 - createdAt
+
+Allowed status transitions: `pending → paid → submitted → shipped` (happy path); `paid | submitted → cancelled` (Printful rejection or manual). `shipped` and `cancelled` are terminal.
 
 BetterAuth user extended with: `slug` (unique), `stripeAccountId`, `chargesEnabled`.
 

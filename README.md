@@ -123,6 +123,7 @@ src/
 ## Key concepts
 
 - **Drop statuses:** `pre_live` → `live` → `closed`. Checkout is only available on `live` drops.
+- **Order statuses:** `pending → paid → submitted → shipped`. Cancellation is allowed from `paid` or `submitted` only. `refundedAt` tracks whether a refund was issued (separate from cancellation status).
 - **Stripe Connect:** each creator connects once; their account is reused for all drops. Platform takes 12% application fee.
 - **Price lock:** once a drop has its first sale, price and design are locked.
 - **Fulfillment:** `checkout.session.completed` webhook submits the order to Printful. Printful rejection triggers an automatic full refund.

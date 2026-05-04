@@ -128,7 +128,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
     await db
       .update(order)
-      .set({ status: "submitted", printfulOrderId: String(printfulOrder.id) })
+      .set({
+        status: "submitted",
+        printfulOrderId: String(printfulOrder.id),
+        confirmationEmailSentAt: new Date(),
+      })
       .where(eq(order.id, newOrder.id))
   } catch {
     await handlePrintfulRejection(session, newOrder.id, record, buyerEmail)
@@ -146,6 +150,7 @@ async function handlePrintfulRejection(
       ? session.payment_intent
       : session.payment_intent?.id
 
+  let refundedAt: Date | null = null
   if (paymentIntentId) {
     try {
       await stripe.refunds.create({
@@ -153,12 +158,22 @@ async function handlePrintfulRejection(
         reverse_transfer: true,
         refund_application_fee: true,
       })
+      refundedAt = new Date()
     } catch {
       // Refund failure should not block cancellation or notifications
     }
   }
 
-  await db.update(order).set({ status: "cancelled" }).where(eq(order.id, orderId))
+  const now = new Date()
+  await db
+    .update(order)
+    .set({
+      status: "cancelled",
+      cancellationReason: "printful_rejection",
+      cancelledAt: now,
+      refundedAt,
+    })
+    .where(eq(order.id, orderId))
 
   const [creator] = await db
     .select({ email: user.email })
