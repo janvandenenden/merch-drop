@@ -3,10 +3,11 @@ import { eq } from "drizzle-orm";
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
-import { user, drop, order } from "@/lib/db/schema";
+import { user, drop, order, orderItem } from "@/lib/db/schema";
 import { submitOrder } from "@/lib/printful";
 import { getSignedUrl } from "@/lib/storage";
 import { BC3001_VARIANTS } from "@/lib/variants";
+import { fixedProductPrice } from "@/lib/pricing";
 import {
   sendOrderCancelledBuyer,
   sendOrderCancelledCreator,
@@ -70,13 +71,13 @@ async function handleAccountUpdated(account: Stripe.Account) {
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const {
     dropId,
-    size,
+    items: itemsJson,
     address: addressJson,
     buyerName,
     fulfillmentCents,
     shippingCents,
   } = session.metadata ?? {};
-  if (!dropId || !size || !addressJson) return;
+  if (!dropId || !itemsJson || !addressJson) return;
 
   const buyerEmail = session.customer_details?.email ?? "";
   const totalCents = session.amount_total ?? 0;
@@ -99,13 +100,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     countryCode: string;
   };
 
+  const items = JSON.parse(itemsJson) as { size: string; quantity: number }[];
+
   const [newOrder] = await db
     .insert(order)
     .values({
       dropId,
       stripeSessionId: session.id,
       status: "paid",
-      size,
       shippingAddress,
       buyerEmail,
       totalCents,
@@ -114,6 +116,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       shippingCents: Number(shippingCents ?? 0),
     })
     .returning();
+
+  const unitPriceCents = fixedProductPrice(record.markupCents);
+  await db.insert(orderItem).values(
+    items.map((item) => ({
+      orderId: newOrder.id,
+      size: item.size,
+      quantity: item.quantity,
+      unitPriceCents,
+    })),
+  );
 
   // Mark first sale — triggers price/design lock on the drop
   if (!record.firstSaleAt) {
@@ -139,7 +151,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       orderNumber,
       dropTitle: record.title,
       storeName: creator?.name ?? record.title,
-      size,
+      items,
       totalCents,
       supportEmail: record.supportEmail,
     }),
@@ -150,9 +162,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
           orderNumber,
           dropTitle: record.title,
           buyerEmail,
-          size,
+          items,
           totalCents,
-          dashboardUrl: `${appUrl}/dashboard`,
+          dashboardUrl: `${appUrl}/dashboard/orders/${newOrder.id}`,
         })
       : Promise.resolve(),
   ]);
@@ -164,10 +176,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   if (!record.printFileKey) return;
 
-  const variantId = BC3001_VARIANTS[size];
-  if (!variantId) return;
-
   const printFileUrl = await getSignedUrl(record.printFileKey);
+
+  const printfulItems = items.flatMap((item) => {
+    const variantId = BC3001_VARIANTS[item.size];
+    if (!variantId) return [];
+    return [{ variantId, quantity: item.quantity, printFileUrl }];
+  });
+
+  if (printfulItems.length === 0) return;
 
   try {
     const printfulOrder = await submitOrder({
@@ -180,7 +197,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         countryCode: shippingAddress.countryCode,
         zip: shippingAddress.zip,
       },
-      items: [{ variantId, quantity: 1, printFileUrl }],
+      items: printfulItems,
     });
 
     await db

@@ -80,8 +80,7 @@ function makeRequest(body: Record<string, unknown>) {
 function validBody(overrides?: Record<string, unknown>) {
   return {
     dropId: DROP_ID,
-    size: "M",
-    quantity: 1,
+    items: [{ size: "M", quantity: 1 }],
     address: ADDRESS,
     selectedRate: SELECTED_RATE,
     fulfillmentCents: 1350,
@@ -145,6 +144,40 @@ describe("POST /api/checkout", () => {
     })
   })
 
+  describe("items validation", () => {
+    it("returns 400 when items is missing", async () => {
+      const { POST } = await import("@/app/api/checkout/route")
+      const body = validBody()
+      delete (body as Record<string, unknown>).items
+      const res = await POST(makeRequest(body))
+      expect(res.status).toBe(400)
+    })
+
+    it("returns 400 when items is empty", async () => {
+      const { POST } = await import("@/app/api/checkout/route")
+      const res = await POST(makeRequest(validBody({ items: [] })))
+      expect(res.status).toBe(400)
+    })
+
+    it("returns 400 when an item has an invalid size", async () => {
+      const { POST } = await import("@/app/api/checkout/route")
+      const res = await POST(makeRequest(validBody({ items: [{ size: "XXXL", quantity: 1 }] })))
+      expect(res.status).toBe(400)
+    })
+
+    it("returns 400 when an item has quantity 0", async () => {
+      const { POST } = await import("@/app/api/checkout/route")
+      const res = await POST(makeRequest(validBody({ items: [{ size: "M", quantity: 0 }] })))
+      expect(res.status).toBe(400)
+    })
+
+    it("returns 400 when an item quantity exceeds 10", async () => {
+      const { POST } = await import("@/app/api/checkout/route")
+      const res = await POST(makeRequest(validBody({ items: [{ size: "M", quantity: 11 }] })))
+      expect(res.status).toBe(400)
+    })
+  })
+
   describe("fulfillmentCents validation", () => {
     it("rejects fulfillmentCents below min (800) with 400", async () => {
       const { POST } = await import("@/app/api/checkout/route")
@@ -203,6 +236,18 @@ describe("POST /api/checkout", () => {
       )
     })
 
+    it("stores serialized items in Stripe session metadata", async () => {
+      const { POST } = await import("@/app/api/checkout/route")
+      await POST(makeRequest(validBody({ items: [{ size: "M", quantity: 2 }, { size: "L", quantity: 1 }] })))
+      expect(mockSessionsCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            items: JSON.stringify([{ size: "M", quantity: 2 }, { size: "L", quantity: 1 }]),
+          }),
+        }),
+      )
+    })
+
     it("stores fulfillmentCents in Stripe session metadata", async () => {
       const { POST } = await import("@/app/api/checkout/route")
       await POST(makeRequest(validBody({ fulfillmentCents: 1350 })))
@@ -223,55 +268,23 @@ describe("POST /api/checkout", () => {
       )
     })
 
-    it("stores quantity in Stripe session metadata", async () => {
+    it("passes total quantity to Stripe line_items", async () => {
       const { POST } = await import("@/app/api/checkout/route")
-      await POST(makeRequest(validBody({ quantity: 3 })))
-      expect(mockSessionsCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadata: expect.objectContaining({ quantity: "3" }),
-        }),
-      )
-    })
-
-    it("passes quantity to Stripe line_items", async () => {
-      const { POST } = await import("@/app/api/checkout/route")
-      await POST(makeRequest(validBody({ quantity: 2 })))
+      await POST(makeRequest(validBody({ items: [{ size: "M", quantity: 2 }, { size: "L", quantity: 1 }] })))
       expect(mockSessionsCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           line_items: expect.arrayContaining([
-            expect.objectContaining({ quantity: 2 }),
+            expect.objectContaining({ quantity: 3 }),
           ]),
         }),
       )
     })
 
-    it("scales productPriceCents and fulfillmentCents by quantity for application fee", async () => {
+    it("scales productPriceCents and fulfillmentCents by total quantity for application fee", async () => {
       mockFixedProductPrice.mockReturnValue(2800)
       const { POST } = await import("@/app/api/checkout/route")
-      await POST(makeRequest(validBody({ quantity: 3, fulfillmentCents: 1350 })))
+      await POST(makeRequest(validBody({ items: [{ size: "M", quantity: 2 }, { size: "L", quantity: 1 }], fulfillmentCents: 1350 })))
       expect(mockComputeApplicationFee).toHaveBeenCalledWith(2800 * 3, 1350 * 3, expect.any(Number))
-    })
-  })
-
-  describe("quantity validation", () => {
-    it("returns 400 when quantity is missing", async () => {
-      const { POST } = await import("@/app/api/checkout/route")
-      const body = validBody()
-      delete (body as Record<string, unknown>).quantity
-      const res = await POST(makeRequest(body))
-      expect(res.status).toBe(400)
-    })
-
-    it("returns 400 when quantity is 0", async () => {
-      const { POST } = await import("@/app/api/checkout/route")
-      const res = await POST(makeRequest(validBody({ quantity: 0 })))
-      expect(res.status).toBe(400)
-    })
-
-    it("returns 400 when quantity exceeds 10", async () => {
-      const { POST } = await import("@/app/api/checkout/route")
-      const res = await POST(makeRequest(validBody({ quantity: 11 })))
-      expect(res.status).toBe(400)
     })
   })
 })

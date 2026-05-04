@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+
 const SIZES = ["S", "M", "L", "XL", "2XL"] as const
 type Size = (typeof SIZES)[number]
 
@@ -27,6 +28,11 @@ interface ShippingRate {
   maxDeliveryDays?: number
 }
 
+interface OrderItem {
+  size: Size
+  quantity: number
+}
+
 interface BuyFormProps {
   dropId: string
   productPriceCents: number
@@ -38,10 +44,9 @@ function formatCents(cents: number) {
 
 export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
   const [step, setStep] = useState<Step>("details")
-  const [size, setSize] = useState<Size | null>(null)
-  const [quantity, setQuantity] = useState(1)
-  const [isEditingSize, setIsEditingSize] = useState(true)
-  const [isEditingAddress, setIsEditingAddress] = useState(false)
+  const [sizeQtys, setSizeQtys] = useState<Record<Size, number>>({
+    S: 0, M: 0, L: 0, XL: 0, "2XL": 0,
+  })
   const [address, setAddress] = useState<Address>({
     name: "",
     address1: "",
@@ -60,14 +65,34 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
     setAddress((a) => ({ ...a, [field]: value }))
   }
 
+  function setQty(size: Size, delta: number) {
+    setSizeQtys((prev) => ({
+      ...prev,
+      [size]: Math.max(0, Math.min(10, prev[size] + delta)),
+    }))
+  }
+
+  const selectedItems: OrderItem[] = SIZES.flatMap((size) =>
+    sizeQtys[size] > 0 ? [{ size, quantity: sizeQtys[size] }] : [],
+  )
+  const totalQuantity = selectedItems.reduce((sum, i) => sum + i.quantity, 0)
+
+  const hasAddress = Boolean(
+    address.name.trim() &&
+      address.address1.trim() &&
+      address.city.trim() &&
+      address.zip.trim() &&
+      address.countryCode.length === 2,
+  )
+  const canContinue = totalQuantity > 0 && hasAddress
+
   async function fetchRates() {
-    if (!size) return
     setLoading(true)
     setError(null)
     const res = await fetch("/api/shipping-rates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dropId, size, quantity, address }),
+      body: JSON.stringify({ dropId, items: selectedItems, address }),
     })
     setLoading(false)
     if (res.ok) {
@@ -86,7 +111,7 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
   }
 
   async function handleBuy() {
-    if (!size || !selectedRateId) return
+    if (!selectedRateId) return
     const selectedRate = rates.find((r) => r.id === selectedRateId)
     if (!selectedRate) return
     setLoading(true)
@@ -94,7 +119,7 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
     const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dropId, size, quantity, address, selectedRate, fulfillmentCents }),
+      body: JSON.stringify({ dropId, items: selectedItems, address, selectedRate, fulfillmentCents }),
     })
     if (res.ok) {
       const { url } = (await res.json()) as { url: string }
@@ -106,15 +131,6 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
   }
 
   if (step === "details") {
-    const hasAddress = Boolean(
-      address.name.trim() &&
-        address.address1.trim() &&
-        address.city.trim() &&
-        address.zip.trim() &&
-        address.countryCode.length === 2
-    )
-    const canContinue = size !== null && hasAddress
-
     return (
       <form
         className="flex flex-col gap-4"
@@ -127,145 +143,100 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
           <p className="text-sm text-muted-foreground">Product</p>
           <p className="text-lg font-semibold">{formatCents(productPriceCents)} each + shipping</p>
         </div>
+
         <div className="rounded-md border border-border px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Quantity</p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40"
-                disabled={quantity <= 1}
-              >
-                −
-              </button>
-              <span className="w-6 text-center text-sm font-medium">{quantity}</span>
-              <button
-                type="button"
-                onClick={() => setQuantity((q) => Math.min(10, q + 1))}
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40"
-                disabled={quantity >= 10}
-              >
-                +
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-md border border-border">
-          <div className="flex items-center justify-between gap-3 px-4 py-3">
-            <div>
-              <p className="text-sm font-medium">Size</p>
-              {size && !isEditingSize && <p className="text-sm text-muted-foreground">{size}</p>}
-            </div>
-            {!isEditingSize && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditingSize(true)
-                  setIsEditingAddress(false)
-                }}
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                {size ? "Change" : "Choose"}
-              </button>
-            )}
-          </div>
-          {isEditingSize && (
-            <div className="border-t border-border px-4 py-3">
-              <div className="flex flex-wrap gap-2">
-                {SIZES.map((s) => (
+          <p className="mb-3 text-sm font-medium">Size &amp; quantity</p>
+          <div className="flex flex-col gap-2">
+            {SIZES.map((size) => (
+              <div key={size} className="flex items-center justify-between gap-3">
+                <span className="w-10 text-sm font-medium">{size}</span>
+                <div className="flex items-center gap-2">
                   <button
-                    key={s}
                     type="button"
-                    onClick={() => {
-                      setSize(s)
-                      setIsEditingSize(false)
-                      setIsEditingAddress(!hasAddress)
-                    }}
-                    className={`min-w-12 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
-                      size === s
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-background hover:bg-muted"
-                    }`}
+                    aria-label={`Decrease ${size} quantity`}
+                    onClick={() => setQty(size, -1)}
+                    disabled={sizeQtys[size] === 0}
+                    className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40"
                   >
-                    {s}
+                    −
                   </button>
-                ))}
+                  <span className="w-6 text-center text-sm font-medium" aria-label={`${size} quantity`}>{sizeQtys[size]}</span>
+                  <button
+                    type="button"
+                    aria-label={`Increase ${size} quantity`}
+                    onClick={() => setQty(size, 1)}
+                    disabled={sizeQtys[size] >= 10}
+                    className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            </div>
+            ))}
+          </div>
+          {totalQuantity > 0 && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              {totalQuantity} shirt{totalQuantity !== 1 ? "s" : ""} · {formatCents(productPriceCents * totalQuantity)} + shipping
+            </p>
           )}
         </div>
+
         <div className="rounded-md border border-border">
-          <div className="flex items-center justify-between gap-3 px-4 py-3">
-            <div>
-              <p className="text-sm font-medium">Shipping address</p>
-              {hasAddress && !isEditingAddress && (
-                <p className="text-sm text-muted-foreground">
-                  {address.city}, {address.countryCode}
-                </p>
-              )}
-            </div>
-            {!isEditingAddress && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsEditingAddress(true)
-                  setIsEditingSize(false)
-                }}
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                {hasAddress ? "Change" : "Add"}
-              </button>
+          <div className="px-4 py-3">
+            <p className="text-sm font-medium">Shipping address</p>
+            {hasAddress && (
+              <p className="text-sm text-muted-foreground">
+                {address.city}, {address.countryCode}
+              </p>
             )}
           </div>
-          {isEditingAddress && (
-            <div className="grid gap-3 border-t border-border px-4 py-3">
+          <div className="grid gap-3 border-t border-border px-4 py-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="name">Full name</Label>
+              <Input id="name" value={address.name} onChange={(e) => patch("name", e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="address1">Address</Label>
+              <Input
+                id="address1"
+                value={address.address1}
+                onChange={(e) => patch("address1", e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="name">Full name</Label>
-                <Input id="name" value={address.name} onChange={(e) => patch("name", e.target.value)} />
+                <Label htmlFor="city">City</Label>
+                <Input id="city" value={address.city} onChange={(e) => patch("city", e.target.value)} />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="address1">Address</Label>
+                <Label htmlFor="zip">ZIP / Postal</Label>
+                <Input id="zip" value={address.zip} onChange={(e) => patch("zip", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="stateCode">State / Province</Label>
                 <Input
-                  id="address1"
-                  value={address.address1}
-                  onChange={(e) => patch("address1", e.target.value)}
+                  id="stateCode"
+                  placeholder="Optional"
+                  value={address.stateCode}
+                  onChange={(e) => patch("stateCode", e.target.value)}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="city">City</Label>
-                  <Input id="city" value={address.city} onChange={(e) => patch("city", e.target.value)} />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="zip">ZIP / Postal</Label>
-                  <Input id="zip" value={address.zip} onChange={(e) => patch("zip", e.target.value)} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="stateCode">State / Province</Label>
-                  <Input
-                    id="stateCode"
-                    placeholder="Optional"
-                    value={address.stateCode}
-                    onChange={(e) => patch("stateCode", e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="countryCode">Country code</Label>
-                  <Input
-                    id="countryCode"
-                    placeholder="US, GB, DE…"
-                    maxLength={2}
-                    value={address.countryCode}
-                    onChange={(e) => patch("countryCode", e.target.value.toUpperCase())}
-                  />
-                </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="countryCode">Country code</Label>
+                <Input
+                  id="countryCode"
+                  placeholder="US, GB, DE…"
+                  maxLength={2}
+                  value={address.countryCode}
+                  onChange={(e) => patch("countryCode", e.target.value.toUpperCase())}
+                />
               </div>
             </div>
-          )}
+          </div>
         </div>
+
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button type="submit" disabled={!canContinue || loading} className="w-full">
           {loading ? "Fetching rates…" : "Calculate shipping"}
@@ -290,11 +261,13 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
   const priceBreakdown = (() => {
     if (!selectedRate) return null
     const shippingCents = Math.round(parseFloat(selectedRate.rate) * 100)
-    const productTotal = productPriceCents * quantity
+    const productTotal = productPriceCents * totalQuantity
     return { shippingCents, productTotal, grandTotal: productTotal + shippingCents }
   })()
 
-  const buyTotalDisplay = priceBreakdown ? formatCents(priceBreakdown.grandTotal) : formatCents(productPriceCents * quantity)
+  const buyTotalDisplay = priceBreakdown
+    ? formatCents(priceBreakdown.grandTotal)
+    : formatCents(productPriceCents * totalQuantity)
 
   return (
     <div className="flex flex-col gap-4">
@@ -323,10 +296,12 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
       </div>
       {priceBreakdown && (
         <div className="rounded-md border border-border bg-muted/30 p-4 text-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Product × {quantity}</span>
-            <span className="font-medium">{formatCents(priceBreakdown.productTotal)}</span>
-          </div>
+          {selectedItems.map((item) => (
+            <div key={item.size} className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">{item.size} × {item.quantity}</span>
+              <span className="font-medium">{formatCents(productPriceCents * item.quantity)}</span>
+            </div>
+          ))}
           <div className="mt-2 flex items-center justify-between gap-3">
             <span className="text-muted-foreground">Shipping</span>
             <span className="font-medium">{formatCents(priceBreakdown.shippingCents)}</span>

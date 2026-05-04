@@ -66,7 +66,6 @@ export const order = pgTable("order", {
   printfulOrderId: text("printful_order_id"),
   trackingNumber: text("tracking_number"),
   status: orderStatusEnum("status").notNull().default("pending"),
-  size: text("size").notNull(),
   shippingAddress: json("shipping_address").notNull(),
   buyerEmail: text("buyer_email").notNull(),
   totalCents: integer("total_cents").notNull(),
@@ -79,6 +78,14 @@ export const order = pgTable("order", {
   confirmationEmailSentAt: timestamp("confirmation_email_sent_at"),
   shippingEmailSentAt: timestamp("shipping_email_sent_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const orderItem = pgTable("order_item", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderId: uuid("order_id").notNull().references(() => order.id, { onDelete: "cascade" }),
+  size: text("size").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPriceCents: integer("unit_price_cents").notNull(),
 });
 
 export const emailTemplateEnum = pgEnum("email_template", [

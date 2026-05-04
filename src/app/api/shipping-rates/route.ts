@@ -10,8 +10,10 @@ import { BASE_SHIRT_COST_CENTS } from "@/lib/pricing"
 
 const bodySchema = z.object({
   dropId: z.string().uuid(),
-  size: z.enum(["S", "M", "L", "XL", "2XL"]),
-  quantity: z.number().int().min(1).max(10),
+  items: z.array(z.object({
+    size: z.enum(["S", "M", "L", "XL", "2XL"]),
+    quantity: z.number().int().min(1).max(10),
+  })).min(1),
   address: z.object({
     name: z.string().min(1),
     address1: z.string().min(1),
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 })
   }
 
-  const { dropId, size, quantity, address } = parsed.data
+  const { dropId, items, address } = parsed.data
 
   const record = await db.query.drop.findFirst({ where: eq(drop.id, dropId) })
   if (!record || record.status !== "live") {
@@ -46,10 +48,11 @@ export async function POST(request: Request) {
   }
   const printFileUrl = await getSignedUrl(record.printFileKey)
 
-  const variantId = BC3001_VARIANTS[size]
-  if (!variantId) {
-    return NextResponse.json({ error: "Invalid size" }, { status: 400 })
-  }
+  const printfulItems = items.map((item) => {
+    const variantId = BC3001_VARIANTS[item.size]
+    if (!variantId) throw new Error(`Invalid size: ${item.size}`)
+    return { variantId, quantity: item.quantity }
+  })
 
   const printfulAddress = {
     address1: address.address1,
@@ -58,8 +61,6 @@ export async function POST(request: Request) {
     countryCode: address.countryCode,
     zip: address.zip,
   }
-  const printfulItems = [{ variantId, quantity }]
-  const printfulItemsForCostEstimate = [{ variantId, quantity: 1 }]
 
   let rates: Awaited<ReturnType<typeof getShippingRates>>
   try {
@@ -74,9 +75,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 422 })
   }
 
+  // Estimate per-unit fulfillment cost (all BC3001 sizes cost the same)
   let fulfillmentCents: number
   try {
-    fulfillmentCents = await estimateOrderCost(printfulAddress, printfulItemsForCostEstimate, printFileUrl)
+    fulfillmentCents = await estimateOrderCost(printfulAddress, [{ variantId: printfulItems[0].variantId, quantity: 1 }], printFileUrl)
   } catch (err) {
     if (err instanceof PrintfulError) {
       console.error("[shipping-rates] estimateOrderCost failed, falling back to base cost", { code: err.code, reason: err.reason, message: err.message })

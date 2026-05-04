@@ -50,8 +50,7 @@ function makeRequest(body: Record<string, unknown>) {
 function validBody(overrides?: Record<string, unknown>) {
   return {
     dropId: DROP_ID,
-    size: "M",
-    quantity: 1,
+    items: [{ size: "M", quantity: 1 }],
     address: {
       name: "Jane Doe",
       address1: "1 Main St",
@@ -86,29 +85,35 @@ describe("POST /api/shipping-rates", () => {
       expect(res.status).toBe(400)
     })
 
-    it("returns 400 on invalid size", async () => {
-      const { POST } = await import("@/app/api/shipping-rates/route")
-      const res = await POST(makeRequest(validBody({ size: "XXXL" })))
-      expect(res.status).toBe(400)
-    })
-
-    it("returns 400 when quantity is missing", async () => {
+    it("returns 400 when items is missing", async () => {
       const { POST } = await import("@/app/api/shipping-rates/route")
       const body = validBody()
-      delete (body as Record<string, unknown>).quantity
+      delete (body as Record<string, unknown>).items
       const res = await POST(makeRequest(body))
       expect(res.status).toBe(400)
     })
 
-    it("returns 400 when quantity is 0", async () => {
+    it("returns 400 when items is empty", async () => {
       const { POST } = await import("@/app/api/shipping-rates/route")
-      const res = await POST(makeRequest(validBody({ quantity: 0 })))
+      const res = await POST(makeRequest(validBody({ items: [] })))
       expect(res.status).toBe(400)
     })
 
-    it("returns 400 when quantity exceeds 10", async () => {
+    it("returns 400 on invalid size in items", async () => {
       const { POST } = await import("@/app/api/shipping-rates/route")
-      const res = await POST(makeRequest(validBody({ quantity: 11 })))
+      const res = await POST(makeRequest(validBody({ items: [{ size: "XXXL", quantity: 1 }] })))
+      expect(res.status).toBe(400)
+    })
+
+    it("returns 400 when item quantity is 0", async () => {
+      const { POST } = await import("@/app/api/shipping-rates/route")
+      const res = await POST(makeRequest(validBody({ items: [{ size: "M", quantity: 0 }] })))
+      expect(res.status).toBe(400)
+    })
+
+    it("returns 400 when item quantity exceeds 10", async () => {
+      const { POST } = await import("@/app/api/shipping-rates/route")
+      const res = await POST(makeRequest(validBody({ items: [{ size: "M", quantity: 11 }] })))
       expect(res.status).toBe(400)
     })
 
@@ -152,16 +157,18 @@ describe("POST /api/shipping-rates", () => {
       expect(ratesAddr).toEqual(estimateAddr)
     })
 
-    it("passes the requested quantity to getShippingRates", async () => {
+    it("passes all items with their quantities to getShippingRates", async () => {
       const { POST } = await import("@/app/api/shipping-rates/route")
-      await POST(makeRequest(validBody({ quantity: 3 })))
+      await POST(makeRequest(validBody({ items: [{ size: "M", quantity: 3 }, { size: "L", quantity: 2 }] })))
       const items = mockGetShippingRates.mock.calls[0][1] as { quantity: number }[]
+      expect(items).toHaveLength(2)
       expect(items[0].quantity).toBe(3)
+      expect(items[1].quantity).toBe(2)
     })
 
-    it("always passes quantity 1 to estimateOrderCost regardless of requested quantity", async () => {
+    it("always passes quantity 1 to estimateOrderCost regardless of requested quantities", async () => {
       const { POST } = await import("@/app/api/shipping-rates/route")
-      await POST(makeRequest(validBody({ quantity: 3 })))
+      await POST(makeRequest(validBody({ items: [{ size: "M", quantity: 3 }] })))
       const items = mockEstimateOrderCost.mock.calls[0][1] as { quantity: number }[]
       expect(items[0].quantity).toBe(1)
     })

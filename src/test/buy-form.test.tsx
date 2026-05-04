@@ -28,18 +28,21 @@ const SHIPPING_RATES_RESPONSE = {
   fulfillmentCents: 1350,
 }
 
-async function goToShippingStep() {
-  vi.mocked(global.fetch).mockResolvedValueOnce(
-    new Response(JSON.stringify(SHIPPING_RATES_RESPONSE), { status: 200 }),
-  )
-
-  await userEvent.click(screen.getByRole("button", { name: "L" }))
+async function fillAddress() {
   await userEvent.type(screen.getByLabelText("Full name"), "Jane Doe")
   await userEvent.type(screen.getByLabelText("Address"), "1 Main St")
   await userEvent.type(screen.getByLabelText("City"), "Portland")
   await userEvent.type(screen.getByLabelText("ZIP / Postal"), "97201")
   await userEvent.type(screen.getByLabelText("Country code"), "US")
+}
 
+async function goToShippingStep(size = "L") {
+  vi.mocked(global.fetch).mockResolvedValueOnce(
+    new Response(JSON.stringify(SHIPPING_RATES_RESPONSE), { status: 200 }),
+  )
+
+  await userEvent.click(screen.getByRole("button", { name: `Increase ${size} quantity` }))
+  await fillAddress()
   await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
   await screen.findByText(/standard/i)
 }
@@ -47,10 +50,10 @@ async function goToShippingStep() {
 // ─── Rendering ────────────────────────────────────────────────────────────────
 
 describe("BuyForm rendering", () => {
-  it("renders all five size options", async () => {
+  it("renders all five sizes in the grid", async () => {
     await renderForm()
     for (const size of ["S", "M", "L", "XL", "2XL"]) {
-      expect(screen.getByRole("button", { name: size })).toBeInTheDocument()
+      expect(screen.getByText(size)).toBeInTheDocument()
     }
   })
 
@@ -59,153 +62,134 @@ describe("BuyForm rendering", () => {
     expect(screen.getByText("$28.50 each + shipping")).toBeInTheDocument()
   })
 
-  it("calculate shipping button is disabled before size and address are entered", async () => {
+  it("all sizes start at quantity 0", async () => {
     await renderForm()
-    expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
-  })
-
-  it("renders quantity picker starting at 1", async () => {
-    await renderForm()
-    expect(screen.getByText("Quantity")).toBeInTheDocument()
-    expect(screen.getByText("1")).toBeInTheDocument()
-  })
-})
-
-// ─── Quantity picker ──────────────────────────────────────────────────────────
-
-describe("quantity picker", () => {
-  it("increments quantity up to 10", async () => {
-    await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "+" }))
-    expect(screen.getByText("2")).toBeInTheDocument()
-  })
-
-  it("decrement is disabled at quantity 1", async () => {
-    await renderForm()
-    expect(screen.getByRole("button", { name: "−" })).toBeDisabled()
-  })
-
-  it("increment is disabled at quantity 10", async () => {
-    await renderForm()
-    for (let i = 0; i < 9; i++) {
-      await userEvent.click(screen.getByRole("button", { name: "+" }))
+    for (const size of ["S", "M", "L", "XL", "2XL"]) {
+      expect(screen.getByLabelText(`${size} quantity`)).toHaveTextContent("0")
     }
-    expect(screen.getByRole("button", { name: "+" })).toBeDisabled()
   })
 
-  it("decrement becomes enabled after incrementing", async () => {
+  it("calculate shipping button is disabled before any qty is selected", async () => {
     await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "+" }))
-    expect(screen.getByRole("button", { name: "−" })).not.toBeDisabled()
-  })
-})
-
-// ─── Size selection ───────────────────────────────────────────────────────────
-
-describe("size selection", () => {
-  it("keeps calculate shipping disabled after only selecting a size", async () => {
-    await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "M" }))
     expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
   })
 
-  it("can switch between sizes", async () => {
+  it("decrease button is disabled at quantity 0", async () => {
     await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "M" }))
-    await userEvent.click(screen.getByRole("button", { name: "Change" }))
-    await userEvent.click(screen.getByRole("button", { name: "XL" }))
-    expect(screen.getByText("XL")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Decrease L quantity" })).toBeDisabled()
+  })
+})
+
+// ─── Size grid quantity controls ──────────────────────────────────────────────
+
+describe("size grid", () => {
+  it("increments a size quantity", async () => {
+    await renderForm()
+    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
+    expect(screen.getByLabelText("M quantity")).toHaveTextContent("1")
+  })
+
+  it("decrements a size quantity", async () => {
+    await renderForm()
+    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "Decrease M quantity" }))
+    expect(screen.getByLabelText("M quantity")).toHaveTextContent("1")
+  })
+
+  it("caps quantity at 10", async () => {
+    await renderForm()
+    for (let i = 0; i < 11; i++) {
+      await userEvent.click(screen.getByRole("button", { name: "Increase S quantity" }))
+    }
+    expect(screen.getByLabelText("S quantity")).toHaveTextContent("10")
+    expect(screen.getByRole("button", { name: "Increase S quantity" })).toBeDisabled()
+  })
+
+  it("multiple sizes can have quantities simultaneously", async () => {
+    await renderForm()
+    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    expect(screen.getByLabelText("M quantity")).toHaveTextContent("1")
+    expect(screen.getByLabelText("L quantity")).toHaveTextContent("2")
+  })
+
+  it("shows total shirt count and subtotal when qty > 0", async () => {
+    await renderForm(3405)
+    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    expect(screen.getByText(/2 shirts/)).toBeInTheDocument()
+    expect(screen.getByText(/\$68\.10/)).toBeInTheDocument()
   })
 })
 
 // ─── Details step ─────────────────────────────────────────────────────────────
 
 describe("details step", () => {
-  it("lets the buyer enter an address before selecting a size", async () => {
+  it("calculate shipping stays disabled with qty but no address", async () => {
     await renderForm()
-    expect(screen.getByRole("button", { name: "M" })).toBeInTheDocument()
-    expect(screen.queryByLabelText("Full name")).not.toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole("button", { name: "Add" }))
-
-    expect(screen.getByLabelText("Full name")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Choose" })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
   })
 
-  it("calculate shipping button is disabled until required fields are filled", async () => {
+  it("calculate shipping stays disabled with address but no qty", async () => {
     await renderForm()
+    await fillAddress()
     expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
+  })
+
+  it("calculate shipping enabled when qty > 0 and address filled", async () => {
+    await renderForm()
+    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    await fillAddress()
+    expect(screen.getByRole("button", { name: /calculate shipping/i })).not.toBeDisabled()
   })
 })
 
 // ─── Shipping step ────────────────────────────────────────────────────────────
 
 describe("shipping step", () => {
-  it("shows shipping rates after address is submitted", async () => {
+  it("shows shipping rates after form is submitted", async () => {
     await renderForm()
     await goToShippingStep()
     expect(screen.getByText(/standard/i)).toBeInTheDocument()
     expect(screen.getAllByText("$5.99")).toHaveLength(2)
   })
 
-  it("shows a Stripe-matching price breakdown", async () => {
-    await renderForm()
-    await goToShippingStep()
-
-    expect(screen.getByText("Product × 1")).toBeInTheDocument()
+  it("shows per-size breakdown rows on shipping step", async () => {
+    await renderForm(3405)
+    await goToShippingStep("L")
+    expect(screen.getByText("L × 1")).toBeInTheDocument()
     expect(screen.getByText("$34.05")).toBeInTheDocument()
-    expect(screen.getByText("Shipping")).toBeInTheDocument()
-    expect(screen.getAllByText("$5.99")).toHaveLength(2)
-    expect(screen.getByText("Total")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /buy.*\$40\.04/i })).toBeInTheDocument()
   })
 
-  it("price breakdown scales with quantity", async () => {
+  it("shows multi-size breakdown when multiple sizes selected", async () => {
     await renderForm(3405)
-    await userEvent.click(screen.getByRole("button", { name: "+" }))
-    await userEvent.click(screen.getByRole("button", { name: "+" }))
-    await goToShippingStep()
+    vi.mocked(global.fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(SHIPPING_RATES_RESPONSE), { status: 200 }),
+    )
+    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    await fillAddress()
+    await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
+    await screen.findByText(/standard/i)
 
-    // 3 × $34.05 = $102.15; shipping $5.99; total $108.14
-    expect(screen.getByText("Product × 3")).toBeInTheDocument()
-    expect(screen.getByText("$102.15")).toBeInTheDocument()
+    expect(screen.getByText("M × 1")).toBeInTheDocument()
+    expect(screen.getByText("L × 2")).toBeInTheDocument()
+    // total: (1 + 2) × $34.05 + $5.99 = $108.14
     expect(screen.getByRole("button", { name: /buy.*\$108\.14/i })).toBeInTheDocument()
-  })
-
-  it("product price on step 2 matches step 1", async () => {
-    await renderForm(3405)
-    expect(screen.getByText("$34.05 each + shipping")).toBeInTheDocument()
-    await goToShippingStep()
-    // step 1 unmounts; product row in breakdown must show the same price
-    expect(screen.getByText("$34.05")).toBeInTheDocument()
-  })
-
-  it("calls /api/shipping-rates with address and size", async () => {
-    await renderForm()
-    await goToShippingStep()
-
-    const [url, init] = vi.mocked(global.fetch).mock.calls[0] as [string, RequestInit]
-    expect(url).toBe("/api/shipping-rates")
-    const body = JSON.parse(init.body as string)
-    expect(body.size).toBe("L")
-    expect(body.quantity).toBe(1)
-    expect(body.address.name).toBe("Jane Doe")
   })
 
   it("shows error message when shipping rates fetch fails", async () => {
     vi.mocked(global.fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ error: "Check your address and try again." }), { status: 422 }),
     )
-
     await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "L" }))
-    await userEvent.type(screen.getByLabelText("Full name"), "Jane Doe")
-    await userEvent.type(screen.getByLabelText("Address"), "1 Main St")
-    await userEvent.type(screen.getByLabelText("City"), "Portland")
-    await userEvent.type(screen.getByLabelText("ZIP / Postal"), "97201")
-    await userEvent.type(screen.getByLabelText("Country code"), "US")
+    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    await fillAddress()
     await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
-
     await screen.findByText("Check your address and try again.")
   })
 })
@@ -213,54 +197,61 @@ describe("shipping step", () => {
 // ─── Checkout submission ──────────────────────────────────────────────────────
 
 describe("checkout submission", () => {
-  it("POSTs fulfillmentCents from shipping-rates response to /api/checkout", async () => {
+  it("POSTs items array to /api/shipping-rates", async () => {
     await renderForm()
-    await goToShippingStep()
+    await goToShippingStep("L")
+
+    const [url, init] = vi.mocked(global.fetch).mock.calls[0] as [string, RequestInit]
+    expect(url).toBe("/api/shipping-rates")
+    const body = JSON.parse(init.body as string)
+    expect(body.items).toEqual([{ size: "L", quantity: 1 }])
+    expect(body.address.name).toBe("Jane Doe")
+  })
+
+  it("POSTs items array to /api/checkout", async () => {
+    await renderForm()
+    await goToShippingStep("L")
 
     vi.mocked(global.fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ url: "https://checkout.stripe.com/session" }), { status: 200 }),
     )
-
     await userEvent.click(screen.getByRole("button", { name: /buy/i }))
 
     await waitFor(() => {
       const checkoutCall = vi.mocked(global.fetch).mock.calls[1] as [string, RequestInit]
       expect(checkoutCall[0]).toBe("/api/checkout")
       const body = JSON.parse(checkoutCall[1].body as string)
+      expect(body.items).toEqual([{ size: "L", quantity: 1 }])
       expect(body.fulfillmentCents).toBe(1350)
-      expect(body.size).toBe("L")
       expect(body.selectedRate.id).toBe("STANDARD")
     })
   })
 
-  it("POSTs quantity to /api/checkout", async () => {
+  it("POSTs all selected sizes in items array", async () => {
     await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "+" }))
-    await userEvent.click(screen.getByRole("button", { name: "+" }))
-    await goToShippingStep()
+    vi.mocked(global.fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(SHIPPING_RATES_RESPONSE), { status: 200 }),
+    )
+    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    await fillAddress()
+    await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
+    await screen.findByText(/standard/i)
 
     vi.mocked(global.fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ url: "https://checkout.stripe.com/session" }), { status: 200 }),
     )
-
     await userEvent.click(screen.getByRole("button", { name: /buy/i }))
 
     await waitFor(() => {
       const checkoutCall = vi.mocked(global.fetch).mock.calls[1] as [string, RequestInit]
-      const body = JSON.parse(checkoutCall[1].body as string)
-      expect(body.quantity).toBe(3)
+      const body = JSON.parse((checkoutCall[1] as RequestInit).body as string)
+      expect(body.items).toEqual([
+        { size: "M", quantity: 1 },
+        { size: "L", quantity: 2 },
+      ])
     })
-  })
-
-  it("sends quantity to /api/shipping-rates when fetching rates", async () => {
-    await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "+" }))
-    await goToShippingStep()
-
-    const shippingCall = vi.mocked(global.fetch).mock.calls[0] as [string, RequestInit]
-    expect(shippingCall[0]).toBe("/api/shipping-rates")
-    const body = JSON.parse(shippingCall[1].body as string)
-    expect(body.quantity).toBe(2)
   })
 
   it("shows Redirecting… while awaiting checkout response", async () => {
@@ -269,9 +260,7 @@ describe("checkout submission", () => {
 
     let resolve!: (v: Response) => void
     vi.mocked(global.fetch).mockReturnValueOnce(new Promise((r) => (resolve = r)))
-
     await userEvent.click(screen.getByRole("button", { name: /buy/i }))
-
     expect(await screen.findByRole("button", { name: /redirecting/i })).toBeInTheDocument()
 
     resolve(new Response(JSON.stringify({ url: "https://checkout.stripe.com/s" }), { status: 200 }))
@@ -284,7 +273,6 @@ describe("checkout submission", () => {
     vi.mocked(global.fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ error: "failed" }), { status: 500 }),
     )
-
     await userEvent.click(screen.getByRole("button", { name: /buy/i }))
 
     await waitFor(() => {

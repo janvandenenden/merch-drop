@@ -60,7 +60,7 @@ export async function sendOrderConfirmationBuyer({
   orderNumber,
   dropTitle,
   storeName,
-  size,
+  items,
   totalCents,
   supportEmail,
 }: {
@@ -69,11 +69,12 @@ export async function sendOrderConfirmationBuyer({
   orderNumber: string
   dropTitle: string
   storeName: string
-  size: string
+  items: { size: string; quantity: number }[]
   totalCents: number
   supportEmail: string
 }) {
   const total = (totalCents / 100).toFixed(2)
+  const itemLines = items.map((i) => `  ${i.size} × ${i.quantity}`)
   await sendTrackedEmail({
     to,
     subject: `Order confirmed — ${dropTitle} by ${storeName}`,
@@ -83,7 +84,8 @@ export async function sendOrderConfirmationBuyer({
       `Store: ${storeName}`,
       `Drop: ${dropTitle}`,
       `Order #: ${orderNumber}`,
-      `Size: ${size}`,
+      `Items:`,
+      ...itemLines,
       `Total: $${total}`,
       ``,
       `We'll email you again when your order ships.`,
@@ -101,7 +103,7 @@ export async function sendOrderNotificationCreator({
   orderNumber,
   dropTitle,
   buyerEmail,
-  size,
+  items,
   totalCents,
   dashboardUrl,
 }: {
@@ -110,11 +112,12 @@ export async function sendOrderNotificationCreator({
   orderNumber: string
   dropTitle: string
   buyerEmail: string
-  size: string
+  items: { size: string; quantity: number }[]
   totalCents: number
   dashboardUrl: string
 }) {
   const total = (totalCents / 100).toFixed(2)
+  const itemLines = items.map((i) => `  ${i.size} × ${i.quantity}`)
   await sendTrackedEmail({
     to,
     subject: `New order for "${dropTitle}"`,
@@ -124,10 +127,11 @@ export async function sendOrderNotificationCreator({
       `Drop: ${dropTitle}`,
       `Order #: ${orderNumber}`,
       `Buyer: ${buyerEmail}`,
-      `Size: ${size}`,
+      `Items:`,
+      ...itemLines,
       `Total: $${total}`,
       ``,
-      `View your orders: ${dashboardUrl}`,
+      `View order: ${dashboardUrl}`,
     ].join("\n"),
     template: "order_notification_creator",
     orderId,
