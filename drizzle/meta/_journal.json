@@ -36,6 +36,13 @@
       "when": 1777885252620,
       "tag": "0004_handy_ultron",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777887395911,
+      "tag": "0005_abnormal_dragon_man",
+      "breakpoints": true
     }
   ]
 }

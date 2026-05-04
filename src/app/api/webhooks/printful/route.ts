@@ -3,7 +3,8 @@ import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
-import { order } from "@/lib/db/schema"
+import { drop, order, user } from "@/lib/db/schema"
+import { sendOrderShippingBuyer } from "@/lib/email"
 
 const signatureHeader = "x-pf-webhook-signature"
 
@@ -75,7 +76,8 @@ function verifyPrintfulSignature(body: string, signature: string, secret: string
 
 async function handlePackageShipped(payload: z.infer<typeof packageShippedSchema>) {
   const printfulOrderId = String(payload.data.order.id)
-  const trackingNumber = String(payload.data.shipment.tracking_number)
+  const rawTracking = String(payload.data.shipment.tracking_number)
+  const trackingNumber = rawTracking.trim() !== "" ? rawTracking : null
 
   const existingOrder = await db.query.order.findFirst({
     where: eq(order.printfulOrderId, printfulOrderId),
@@ -90,4 +92,26 @@ async function handlePackageShipped(payload: z.infer<typeof packageShippedSchema
     .update(order)
     .set({ status: "shipped", trackingNumber, shippingEmailSentAt: new Date() })
     .where(eq(order.id, existingOrder.id))
+
+  if (existingOrder.shippingEmailSentAt) return
+
+  const dropRecord = await db.query.drop.findFirst({
+    where: eq(drop.id, existingOrder.dropId),
+  })
+  if (!dropRecord) return
+
+  const [creator] = await db
+    .select({ name: user.name })
+    .from(user)
+    .where(eq(user.id, dropRecord.userId))
+    .limit(1)
+
+  await sendOrderShippingBuyer({
+    to: existingOrder.buyerEmail,
+    orderId: existingOrder.id,
+    dropTitle: dropRecord.title,
+    storeName: creator?.name ?? dropRecord.title,
+    trackingNumber,
+    supportEmail: dropRecord.supportEmail,
+  })
 }

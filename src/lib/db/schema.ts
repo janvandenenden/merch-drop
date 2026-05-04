@@ -81,6 +81,23 @@ export const order = pgTable("order", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const emailTemplateEnum = pgEnum("email_template", [
+  "order_confirmation_buyer",
+  "order_notification_creator",
+  "order_shipped_buyer",
+  "order_cancelled_buyer",
+  "order_cancelled_creator",
+]);
+
+export const emailLog = pgTable("email_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderId: uuid("order_id"),
+  template: emailTemplateEnum("template").notNull(),
+  recipient: text("recipient").notNull(),
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+  error: text("error"),
+});
+
 // BetterAuth user extension — add these columns to the BetterAuth-managed user table
 export const user = pgTable("user", {
   id: text("id").primaryKey(),

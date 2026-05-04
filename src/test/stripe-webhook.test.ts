@@ -51,9 +51,13 @@ vi.mock("@/lib/storage", () => ({ getSignedUrl: mockGetSignedUrl }))
 
 const mockSendBuyer = vi.fn()
 const mockSendCreator = vi.fn()
+const mockSendConfirmationBuyer = vi.fn()
+const mockSendNotificationCreator = vi.fn()
 vi.mock("@/lib/email", () => ({
   sendOrderCancelledBuyer: mockSendBuyer,
   sendOrderCancelledCreator: mockSendCreator,
+  sendOrderConfirmationBuyer: mockSendConfirmationBuyer,
+  sendOrderNotificationCreator: mockSendNotificationCreator,
 }))
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -82,6 +86,7 @@ const DROP_RECORD = {
   markupCents: 1000,
   printFileKey: "prints/drop-uuid-1.pdf",
   firstSaleAt: null,
+  supportEmail: "support@example.com",
 }
 
 const NEW_ORDER = { id: "order-uuid-1" }
@@ -114,11 +119,13 @@ beforeEach(() => {
   mockUpdateDrop.mockResolvedValue(undefined)
   mockUpdateOrder.mockResolvedValue(undefined)
   mockUpdateOrderSet.mockReturnValue({ where: mockUpdateOrder })
-  mockSelectUser.mockResolvedValue([{ email: "creator@example.com" }])
+  mockSelectUser.mockResolvedValue([{ email: "creator@example.com", name: "Jan Store" }])
   mockGetSignedUrl.mockResolvedValue("https://r2.example.com/print.pdf")
   mockRefundsCreate.mockResolvedValue({ id: "re_test_abc" })
   mockSendBuyer.mockResolvedValue(undefined)
   mockSendCreator.mockResolvedValue(undefined)
+  mockSendConfirmationBuyer.mockResolvedValue(undefined)
+  mockSendNotificationCreator.mockResolvedValue(undefined)
 })
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -154,6 +161,41 @@ describe("POST /api/stripe/webhook", () => {
       expect(mockUpdateDrop).toHaveBeenCalled()
     })
 
+    it("sends buyer confirmation email on paid", async () => {
+      mockSubmitOrder.mockResolvedValue({ id: 99, status: "pending", recipient: {}, items: [] })
+
+      const { POST } = await import("@/app/api/stripe/webhook/route")
+      await POST(makeWebhookRequest("checkout.session.completed"))
+
+      expect(mockSendConfirmationBuyer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: "buyer@example.com",
+          dropTitle: "Summer Drop",
+          storeName: "Jan Store",
+          size: "M",
+          totalCents: 2500,
+          supportEmail: "support@example.com",
+        }),
+      )
+    })
+
+    it("sends creator notification email on paid", async () => {
+      mockSubmitOrder.mockResolvedValue({ id: 99, status: "pending", recipient: {}, items: [] })
+
+      const { POST } = await import("@/app/api/stripe/webhook/route")
+      await POST(makeWebhookRequest("checkout.session.completed"))
+
+      expect(mockSendNotificationCreator).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: "creator@example.com",
+          dropTitle: "Summer Drop",
+          buyerEmail: "buyer@example.com",
+          size: "M",
+          totalCents: 2500,
+        }),
+      )
+    })
+
     it("does not set firstSaleAt when already set", async () => {
       mockFindFirstDrop.mockResolvedValue({ ...DROP_RECORD, firstSaleAt: new Date() })
       mockSubmitOrder.mockResolvedValue({ id: 99, status: "pending", recipient: {}, items: [] })
@@ -185,7 +227,8 @@ describe("POST /api/stripe/webhook", () => {
       const { POST } = await import("@/app/api/stripe/webhook/route")
       await POST(makeWebhookRequest("checkout.session.completed"))
 
-      const setArgs = mockUpdateOrderSet.mock.calls[0]?.[0] ?? {}
+      // call[0] = confirmationEmailSentAt, call[1] = cancellation
+      const setArgs = mockUpdateOrderSet.mock.calls[1]?.[0] ?? {}
       expect(setArgs).toMatchObject({
         status: "cancelled",
         cancellationReason: "printful_rejection",
@@ -197,7 +240,7 @@ describe("POST /api/stripe/webhook", () => {
       const { POST } = await import("@/app/api/stripe/webhook/route")
       await POST(makeWebhookRequest("checkout.session.completed"))
 
-      const setArgs = mockUpdateOrderSet.mock.calls[0]?.[0] ?? {}
+      const setArgs = mockUpdateOrderSet.mock.calls[1]?.[0] ?? {}
       expect(setArgs.refundedAt).toBeInstanceOf(Date)
     })
 
@@ -207,16 +250,16 @@ describe("POST /api/stripe/webhook", () => {
       const { POST } = await import("@/app/api/stripe/webhook/route")
       await POST(makeWebhookRequest("checkout.session.completed"))
 
-      const setArgs = mockUpdateOrderSet.mock.calls[0]?.[0] ?? {}
+      const setArgs = mockUpdateOrderSet.mock.calls[1]?.[0] ?? {}
       expect(setArgs.refundedAt).toBeNull()
     })
 
-    it("emails buyer and creator", async () => {
+    it("emails buyer and creator cancellation notifications", async () => {
       const { POST } = await import("@/app/api/stripe/webhook/route")
       await POST(makeWebhookRequest("checkout.session.completed"))
 
-      expect(mockSendBuyer).toHaveBeenCalledWith("buyer@example.com", "Summer Drop")
-      expect(mockSendCreator).toHaveBeenCalledWith("creator@example.com", "Summer Drop")
+      expect(mockSendBuyer).toHaveBeenCalledWith("buyer@example.com", "Summer Drop", "order-uuid-1")
+      expect(mockSendCreator).toHaveBeenCalledWith("creator@example.com", "Summer Drop", "order-uuid-1")
     })
 
     it("still cancels order if refund call fails", async () => {
