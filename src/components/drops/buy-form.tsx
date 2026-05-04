@@ -39,6 +39,7 @@ function formatCents(cents: number) {
 export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
   const [step, setStep] = useState<Step>("details")
   const [size, setSize] = useState<Size | null>(null)
+  const [quantity, setQuantity] = useState(1)
   const [isEditingSize, setIsEditingSize] = useState(true)
   const [isEditingAddress, setIsEditingAddress] = useState(false)
   const [address, setAddress] = useState<Address>({
@@ -66,7 +67,7 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
     const res = await fetch("/api/shipping-rates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dropId, size, address }),
+      body: JSON.stringify({ dropId, size, quantity, address }),
     })
     setLoading(false)
     if (res.ok) {
@@ -93,7 +94,7 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
     const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dropId, size, address, selectedRate, fulfillmentCents }),
+      body: JSON.stringify({ dropId, size, quantity, address, selectedRate, fulfillmentCents }),
     })
     if (res.ok) {
       const { url } = (await res.json()) as { url: string }
@@ -124,7 +125,31 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
       >
         <div className="rounded-md bg-muted/40 px-4 py-3">
           <p className="text-sm text-muted-foreground">Product</p>
-          <p className="text-lg font-semibold">{formatCents(productPriceCents)} + shipping</p>
+          <p className="text-lg font-semibold">{formatCents(productPriceCents)} each + shipping</p>
+        </div>
+        <div className="rounded-md border border-border px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium">Quantity</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40"
+                disabled={quantity <= 1}
+              >
+                −
+              </button>
+              <span className="w-6 text-center text-sm font-medium">{quantity}</span>
+              <button
+                type="button"
+                onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40"
+                disabled={quantity >= 10}
+              >
+                +
+              </button>
+            </div>
+          </div>
         </div>
         <div className="rounded-md border border-border">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
@@ -265,10 +290,11 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
   const priceBreakdown = (() => {
     if (!selectedRate) return null
     const shippingCents = Math.round(parseFloat(selectedRate.rate) * 100)
-    return { shippingCents, grandTotal: productPriceCents + shippingCents }
+    const productTotal = productPriceCents * quantity
+    return { shippingCents, productTotal, grandTotal: productTotal + shippingCents }
   })()
 
-  const buyTotalDisplay = priceBreakdown ? formatCents(priceBreakdown.grandTotal) : formatCents(productPriceCents)
+  const buyTotalDisplay = priceBreakdown ? formatCents(priceBreakdown.grandTotal) : formatCents(productPriceCents * quantity)
 
   return (
     <div className="flex flex-col gap-4">
@@ -298,8 +324,8 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
       {priceBreakdown && (
         <div className="rounded-md border border-border bg-muted/30 p-4 text-sm">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Product</span>
-            <span className="font-medium">{formatCents(productPriceCents)}</span>
+            <span className="text-muted-foreground">Product × {quantity}</span>
+            <span className="font-medium">{formatCents(priceBreakdown.productTotal)}</span>
           </div>
           <div className="mt-2 flex items-center justify-between gap-3">
             <span className="text-muted-foreground">Shipping</span>

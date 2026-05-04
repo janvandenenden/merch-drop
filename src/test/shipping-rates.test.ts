@@ -51,6 +51,7 @@ function validBody(overrides?: Record<string, unknown>) {
   return {
     dropId: DROP_ID,
     size: "M",
+    quantity: 1,
     address: {
       name: "Jane Doe",
       address1: "1 Main St",
@@ -88,6 +89,26 @@ describe("POST /api/shipping-rates", () => {
     it("returns 400 on invalid size", async () => {
       const { POST } = await import("@/app/api/shipping-rates/route")
       const res = await POST(makeRequest(validBody({ size: "XXXL" })))
+      expect(res.status).toBe(400)
+    })
+
+    it("returns 400 when quantity is missing", async () => {
+      const { POST } = await import("@/app/api/shipping-rates/route")
+      const body = validBody()
+      delete (body as Record<string, unknown>).quantity
+      const res = await POST(makeRequest(body))
+      expect(res.status).toBe(400)
+    })
+
+    it("returns 400 when quantity is 0", async () => {
+      const { POST } = await import("@/app/api/shipping-rates/route")
+      const res = await POST(makeRequest(validBody({ quantity: 0 })))
+      expect(res.status).toBe(400)
+    })
+
+    it("returns 400 when quantity exceeds 10", async () => {
+      const { POST } = await import("@/app/api/shipping-rates/route")
+      const res = await POST(makeRequest(validBody({ quantity: 11 })))
       expect(res.status).toBe(400)
     })
 
@@ -129,6 +150,20 @@ describe("POST /api/shipping-rates", () => {
       const ratesAddr = mockGetShippingRates.mock.calls[0][0]
       const estimateAddr = mockEstimateOrderCost.mock.calls[0][0]
       expect(ratesAddr).toEqual(estimateAddr)
+    })
+
+    it("passes the requested quantity to getShippingRates", async () => {
+      const { POST } = await import("@/app/api/shipping-rates/route")
+      await POST(makeRequest(validBody({ quantity: 3 })))
+      const items = mockGetShippingRates.mock.calls[0][1] as { quantity: number }[]
+      expect(items[0].quantity).toBe(3)
+    })
+
+    it("always passes quantity 1 to estimateOrderCost regardless of requested quantity", async () => {
+      const { POST } = await import("@/app/api/shipping-rates/route")
+      await POST(makeRequest(validBody({ quantity: 3 })))
+      const items = mockEstimateOrderCost.mock.calls[0][1] as { quantity: number }[]
+      expect(items[0].quantity).toBe(1)
     })
   })
 

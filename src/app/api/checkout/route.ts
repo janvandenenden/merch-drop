@@ -27,6 +27,7 @@ const selectedRateSchema = z.object({
 const bodySchema = z.object({
   dropId: z.string().uuid(),
   size: z.enum(["S", "M", "L", "XL", "2XL"]),
+  quantity: z.number().int().min(1).max(10),
   address: addressSchema,
   selectedRate: selectedRateSchema,
   fulfillmentCents: z.number().int(),
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 })
   }
 
-  const { dropId, size, address, selectedRate, fulfillmentCents: clientFulfillmentCents } = parsed.data
+  const { dropId, size, quantity, address, selectedRate, fulfillmentCents: clientFulfillmentCents } = parsed.data
 
   const record = await db.query.drop.findFirst({ where: eq(drop.id, dropId) })
   if (!record || record.status !== "live") {
@@ -65,7 +66,11 @@ export async function POST(request: Request) {
 
   const shippingAmountCents = Math.round(parseFloat(selectedRate.rate) * 100)
   const productPriceCents = fixedProductPrice(record.markupCents)
-  const { applicationFee } = computeApplicationFee(productPriceCents, clientFulfillmentCents, shippingAmountCents)
+  const { applicationFee } = computeApplicationFee(
+    productPriceCents * quantity,
+    clientFulfillmentCents * quantity,
+    shippingAmountCents,
+  )
 
   const baseUrl = process.env.NEXT_PUBLIC_URL ?? "http://localhost:3000"
   const creatorSlug = creator.slug ?? creator.id
@@ -104,7 +109,7 @@ export async function POST(request: Request) {
           unit_amount: productPriceCents,
           product_data: { name: record.title },
         },
-        quantity: 1,
+        quantity,
       },
     ],
     shipping_options: shippingRateData,
@@ -116,6 +121,7 @@ export async function POST(request: Request) {
     metadata: {
       dropId,
       size,
+      quantity: String(quantity),
       buyerName: address.name,
       address: JSON.stringify(address),
       shippingRateId: selectedRate.id,
