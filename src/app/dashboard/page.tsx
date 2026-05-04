@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { listDrops } from "@/lib/drops"
+import { getDropStatsForCreator } from "@/lib/orders"
 import { SignOutButton } from "@/components/sign-out-button"
 import { CopyButton } from "@/components/drops/copy-button"
 import { DropActions } from "@/components/drops/drop-actions"
@@ -16,6 +17,7 @@ import {
   CardContent,
 } from "@/components/ui/card"
 import type { Drop } from "@/lib/drops"
+import type { DropStats } from "@/lib/orders"
 
 const STATUS_LABELS: Record<Drop["status"], string> = {
   pre_live: "Pre-live",
@@ -38,7 +40,11 @@ export default async function DashboardPage() {
   if (!session) redirect("/login")
 
   const { user } = session
-  const drops = await listDrops(user.id)
+  const [drops, dropStats] = await Promise.all([
+    listDrops(user.id),
+    getDropStatsForCreator(user.id),
+  ])
+  const statsMap = new Map(dropStats.map((s) => [s.dropId, s]))
   const needsStripe = !user.chargesEnabled
 
   const activeDrops = drops.filter((d) => d.status !== "closed")
@@ -46,6 +52,7 @@ export default async function DashboardPage() {
 
   function renderDrop(drop: Drop) {
     const shareUrl = `${BASE_URL}/${user.slug}/${drop.slug}`
+    const stats = statsMap.get(drop.id)
 
     return (
       <Card key={drop.id}>
@@ -68,7 +75,15 @@ export default async function DashboardPage() {
           {drop.status !== "closed" && (
             <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/drops/${drop.id}/edit`} />}>Edit</Button>
           )}
+          <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/dashboard/orders?drop=${drop.id}`} />}>
+            View orders{stats && stats.orderCount > 0 ? ` (${stats.orderCount})` : ""}
+          </Button>
           <DropActions drop={drop} chargesEnabled={!!user.chargesEnabled} />
+          {stats && stats.orderCount > 0 && (
+            <span className="ml-auto text-xs text-muted-foreground">
+              ${(stats.revenueCents / 100).toFixed(2)} earned
+            </span>
+          )}
         </CardContent>
       </Card>
     )
