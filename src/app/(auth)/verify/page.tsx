@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Suspense } from "react";
 import { authClient } from "@/lib/auth-client";
+import { PAGE_MIN_HEIGHT_CLASS } from "@/lib/layout";
 import { Button } from "@/components/ui/button";
 
 const verifySchema = z.object({
@@ -49,6 +50,7 @@ function VerifyForm() {
     }
 
     router.push("/dashboard");
+    router.refresh?.();
   }
 
   async function resend() {
@@ -56,7 +58,7 @@ function VerifyForm() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
+    <main className={`${PAGE_MIN_HEIGHT_CLASS} flex items-center justify-center p-4`}>
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold">Check your email</h1>

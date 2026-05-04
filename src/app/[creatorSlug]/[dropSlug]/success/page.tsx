@@ -1,3 +1,4 @@
+import { PAGE_MIN_HEIGHT_CLASS } from "@/lib/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface Props {
@@ -8,7 +9,7 @@ export default async function SuccessPage({ params }: Props) {
   const { creatorSlug, dropSlug } = await params
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
+    <main className={`${PAGE_MIN_HEIGHT_CLASS} flex items-center justify-center p-8`}>
       <Card className="w-full max-w-md text-center">
         <CardHeader>
           <CardTitle className="text-2xl">Order confirmed</CardTitle>

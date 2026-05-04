@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { authClient } from "@/lib/auth-client";
+import { PAGE_MIN_HEIGHT_CLASS } from "@/lib/layout";
 import { Button } from "@/components/ui/button";
 
 const loginSchema = z.object({
@@ -40,7 +41,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
+    <main className={`${PAGE_MIN_HEIGHT_CLASS} flex items-center justify-center p-4`}>
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold">Log in</h1>

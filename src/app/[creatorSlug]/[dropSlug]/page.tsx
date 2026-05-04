@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import Image from "next/image"
 import { getDropBySlug } from "@/lib/drops"
+import { PAGE_MIN_HEIGHT_CLASS } from "@/lib/layout"
 import { getSignedUrl } from "@/lib/storage"
 import { fixedProductPrice } from "@/lib/pricing"
 import { BuyForm } from "@/components/drops/buy-form"
@@ -20,7 +21,7 @@ export default async function PublicDropPage({ params }: Props) {
 
   if (drop.status === "pre_live" || drop.status === "paused") {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
+      <main className={`${PAGE_MIN_HEIGHT_CLASS} flex items-center justify-center p-8`}>
         <Card className="w-full max-w-md text-center">
           <CardHeader>
             <CardTitle className="text-2xl">{drop.title}</CardTitle>
@@ -44,7 +45,7 @@ export default async function PublicDropPage({ params }: Props) {
 
   if (drop.status === "closed") {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
+      <main className={`${PAGE_MIN_HEIGHT_CLASS} flex items-center justify-center p-8`}>
         <Card className="w-full max-w-md text-center">
           <CardHeader>
             <CardTitle className="text-2xl">{drop.title}</CardTitle>
@@ -69,7 +70,7 @@ export default async function PublicDropPage({ params }: Props) {
   const productPriceCents = fixedProductPrice(drop.markupCents)
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
+    <main className={`${PAGE_MIN_HEIGHT_CLASS} flex items-center justify-center p-8`}>
       <div className="w-full max-w-4xl">
         <div className="grid gap-8 md:grid-cols-2">
           <div className="overflow-hidden rounded-xl bg-muted">

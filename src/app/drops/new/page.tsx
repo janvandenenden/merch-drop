@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
+import { PAGE_MIN_HEIGHT_CLASS } from "@/lib/layout"
 import { NewDropForm } from "@/components/drops/new-drop-form"
 
 export default async function NewDropPage() {
@@ -8,7 +9,7 @@ export default async function NewDropPage() {
   if (!session) redirect("/login")
 
   return (
-    <main className="min-h-screen p-8">
+    <main className={`${PAGE_MIN_HEIGHT_CLASS} p-8`}>
       <div className="mx-auto max-w-xl space-y-8">
         <div>
           <h1 className="text-2xl font-semibold">Create a drop</h1>

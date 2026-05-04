@@ -3,8 +3,8 @@ import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { listDrops } from "@/lib/drops"
+import { APP_CONTENT_CLASS, APP_PAGE_CLASS } from "@/lib/layout"
 import { getDropStatsForCreator } from "@/lib/orders"
-import { SignOutButton } from "@/components/sign-out-button"
 import { CopyButton } from "@/components/drops/copy-button"
 import { DropActions } from "@/components/drops/drop-actions"
 import { Button } from "@/components/ui/button"
@@ -90,8 +90,8 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="mx-auto max-w-3xl space-y-8">
+    <main className={APP_PAGE_CLASS}>
+      <div className={`${APP_CONTENT_CLASS} space-y-8`}>
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold">Your drops</h1>
@@ -101,7 +101,6 @@ export default async function DashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             <Button nativeButton={false} render={<Link href="/drops/new" />}>New drop</Button>
-            <SignOutButton />
           </div>
         </div>
 

@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { getDrop } from "@/lib/drops"
+import { PAGE_MIN_HEIGHT_CLASS } from "@/lib/layout"
 import { getSignedUrl } from "@/lib/storage"
 import { DesignStep } from "@/components/drops/design-step"
 
@@ -19,7 +20,7 @@ export default async function DesignPage({
   if (!drop || drop.userId !== session.user.id) notFound()
 
   return (
-    <main className="min-h-screen p-8">
+    <main className={`${PAGE_MIN_HEIGHT_CLASS} p-8`}>
       <div className="mx-auto max-w-xl space-y-8">
         <div>
           <h1 className="text-2xl font-semibold">Design your drop</h1>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { listDrops } from "@/lib/drops"
+import { APP_CONTENT_CLASS, APP_PAGE_CLASS } from "@/lib/layout"
 import { listOrdersForCreator } from "@/lib/orders"
 import { Button } from "@/components/ui/button"
 import {
@@ -48,8 +49,8 @@ export default async function OrdersPage({
   }
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="mx-auto max-w-5xl space-y-6">
+    <main className={APP_PAGE_CLASS}>
+      <div className={`${APP_CONTENT_CLASS} space-y-6`}>
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
+import { APP_CONTENT_CLASS, APP_PAGE_CLASS } from "@/lib/layout"
 import { getOrderForCreator } from "@/lib/orders"
 import { StatusBadge } from "@/components/orders/status-badge"
 
@@ -84,8 +85,8 @@ export default async function OrderDetailPage({
   const dropPublicUrl = `${BASE_URL}/${session.user.slug}/${order.drop.slug}`
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="mx-auto max-w-2xl space-y-6">
+    <main className={APP_PAGE_CLASS}>
+      <div className={`${APP_CONTENT_CLASS} space-y-6`}>
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Link href="/dashboard" className="hover:underline">Drops</Link>
