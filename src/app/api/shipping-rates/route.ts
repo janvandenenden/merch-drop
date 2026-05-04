@@ -11,6 +11,7 @@ import { BASE_SHIRT_COST_CENTS } from "@/lib/pricing"
 const bodySchema = z.object({
   dropId: z.string().uuid(),
   size: z.enum(["S", "M", "L", "XL", "2XL"]),
+  quantity: z.number().int().min(1).max(10),
   address: z.object({
     name: z.string().min(1),
     address1: z.string().min(1),
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 })
   }
 
-  const { dropId, size, address } = parsed.data
+  const { dropId, size, quantity, address } = parsed.data
 
   const record = await db.query.drop.findFirst({ where: eq(drop.id, dropId) })
   if (!record || record.status !== "live") {
@@ -57,7 +58,8 @@ export async function POST(request: Request) {
     countryCode: address.countryCode,
     zip: address.zip,
   }
-  const printfulItems = [{ variantId, quantity: 1 }]
+  const printfulItems = [{ variantId, quantity }]
+  const printfulItemsForCostEstimate = [{ variantId, quantity: 1 }]
 
   let rates: Awaited<ReturnType<typeof getShippingRates>>
   try {
@@ -74,7 +76,7 @@ export async function POST(request: Request) {
 
   let fulfillmentCents: number
   try {
-    fulfillmentCents = await estimateOrderCost(printfulAddress, printfulItems, printFileUrl)
+    fulfillmentCents = await estimateOrderCost(printfulAddress, printfulItemsForCostEstimate, printFileUrl)
   } catch (err) {
     if (err instanceof PrintfulError) {
       console.error("[shipping-rates] estimateOrderCost failed, falling back to base cost", { code: err.code, reason: err.reason, message: err.message })
