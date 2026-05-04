@@ -29,6 +29,10 @@ const SHIPPING_RATES_RESPONSE = {
 }
 
 async function fillAddress() {
+  const addressToggle = screen.getByRole("button", { name: /shipping address/i })
+  if (addressToggle.getAttribute("aria-expanded") === "false") {
+    await userEvent.click(addressToggle)
+  }
   await userEvent.type(screen.getByLabelText("Full name"), "Jane Doe")
   await userEvent.type(screen.getByLabelText("Address"), "1 Main St")
   await userEvent.type(screen.getByLabelText("City"), "Portland")
@@ -41,7 +45,7 @@ async function goToShippingStep(size = "L") {
     new Response(JSON.stringify(SHIPPING_RATES_RESPONSE), { status: 200 }),
   )
 
-  await userEvent.click(screen.getByRole("button", { name: `Increase ${size} quantity` }))
+  await userEvent.click(screen.getByRole("button", { name: size }))
   await fillAddress()
   await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
   await screen.findByText(/standard/i)
@@ -50,55 +54,62 @@ async function goToShippingStep(size = "L") {
 // ─── Rendering ────────────────────────────────────────────────────────────────
 
 describe("BuyForm rendering", () => {
-  it("renders all five sizes in the grid", async () => {
+  it("renders all five sizes as buttons", async () => {
     await renderForm()
     for (const size of ["S", "M", "L", "XL", "2XL"]) {
-      expect(screen.getByText(size)).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: size })).toBeInTheDocument()
     }
   })
 
   it("shows the fixed product price on the details step", async () => {
     await renderForm(2850)
-    expect(screen.getByText("$28.50 each + shipping")).toBeInTheDocument()
+    expect(screen.getByText("$28.50")).toBeInTheDocument()
+    expect(screen.getByText("Shipping calculated after address.")).toBeInTheDocument()
   })
 
-  it("all sizes start at quantity 0", async () => {
+  it("defaults to one medium shirt", async () => {
     await renderForm()
-    for (const size of ["S", "M", "L", "XL", "2XL"]) {
-      expect(screen.getByLabelText(`${size} quantity`)).toHaveTextContent("0")
-    }
+    expect(screen.getByRole("button", { name: "M" })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByText(/1 shirt/)).toBeInTheDocument()
   })
 
-  it("calculate shipping button is disabled before any qty is selected", async () => {
+  it("calculate shipping button is disabled before an address is added", async () => {
     await renderForm()
     expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
   })
 
-  it("decrease button is disabled at quantity 0", async () => {
+  it("keeps the quantity grid hidden by default", async () => {
     await renderForm()
-    expect(screen.getByRole("button", { name: "Decrease L quantity" })).toBeDisabled()
+    expect(screen.queryByRole("button", { name: "Decrease L quantity" })).not.toBeInTheDocument()
   })
 })
 
 // ─── Size grid quantity controls ──────────────────────────────────────────────
 
 describe("size grid", () => {
+  async function showMultiBuy() {
+    await userEvent.click(screen.getByRole("checkbox", { name: "Buy multiple" }))
+  }
+
   it("increments a size quantity", async () => {
     await renderForm()
+    await showMultiBuy()
     await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
-    expect(screen.getByLabelText("M quantity")).toHaveTextContent("1")
+    expect(screen.getByLabelText("M quantity")).toHaveTextContent("2")
   })
 
   it("decrements a size quantity", async () => {
     await renderForm()
+    await showMultiBuy()
     await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
     await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
     await userEvent.click(screen.getByRole("button", { name: "Decrease M quantity" }))
-    expect(screen.getByLabelText("M quantity")).toHaveTextContent("1")
+    expect(screen.getByLabelText("M quantity")).toHaveTextContent("2")
   })
 
   it("caps quantity at 10", async () => {
     await renderForm()
+    await showMultiBuy()
     for (let i = 0; i < 11; i++) {
       await userEvent.click(screen.getByRole("button", { name: "Increase S quantity" }))
     }
@@ -108,19 +119,20 @@ describe("size grid", () => {
 
   it("multiple sizes can have quantities simultaneously", async () => {
     await renderForm()
+    await showMultiBuy()
     await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
     await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
     await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
-    expect(screen.getByLabelText("M quantity")).toHaveTextContent("1")
+    expect(screen.getByLabelText("M quantity")).toHaveTextContent("2")
     expect(screen.getByLabelText("L quantity")).toHaveTextContent("2")
   })
 
-  it("shows total shirt count and subtotal when qty > 0", async () => {
+  it("shows selected shirt count when qty > 0", async () => {
     await renderForm(3405)
-    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
+    await userEvent.click(screen.getByRole("checkbox", { name: "Buy multiple" }))
     await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
-    expect(screen.getByText(/2 shirts/)).toBeInTheDocument()
-    expect(screen.getByText(/\$68\.10/)).toBeInTheDocument()
+    expect(screen.getByText("2 shirts selected")).toBeInTheDocument()
+    expect(screen.queryByText(/\$68\.10/)).not.toBeInTheDocument()
   })
 })
 
@@ -129,19 +141,20 @@ describe("size grid", () => {
 describe("details step", () => {
   it("calculate shipping stays disabled with qty but no address", async () => {
     await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "L" }))
     expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
   })
 
-  it("calculate shipping stays disabled with address but no qty", async () => {
+  it("shipping address is collapsed until the buyer opens it", async () => {
     await renderForm()
-    await fillAddress()
-    expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
+    expect(screen.queryByLabelText("Full name")).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: /shipping address/i }))
+    expect(screen.getByLabelText("Full name")).toBeInTheDocument()
   })
 
   it("calculate shipping enabled when qty > 0 and address filled", async () => {
     await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "L" }))
     await fillAddress()
     expect(screen.getByRole("button", { name: /calculate shipping/i })).not.toBeDisabled()
   })
@@ -169,7 +182,7 @@ describe("shipping step", () => {
     vi.mocked(global.fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(SHIPPING_RATES_RESPONSE), { status: 200 }),
     )
-    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
+    await userEvent.click(screen.getByRole("checkbox", { name: "Buy multiple" }))
     await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
     await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
     await fillAddress()
@@ -187,7 +200,7 @@ describe("shipping step", () => {
       new Response(JSON.stringify({ error: "Check your address and try again." }), { status: 422 }),
     )
     await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
+    await userEvent.click(screen.getByRole("button", { name: "L" }))
     await fillAddress()
     await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
     await screen.findByText("Check your address and try again.")
@@ -232,7 +245,7 @@ describe("checkout submission", () => {
     vi.mocked(global.fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(SHIPPING_RATES_RESPONSE), { status: 200 }),
     )
-    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
+    await userEvent.click(screen.getByRole("checkbox", { name: "Buy multiple" }))
     await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
     await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
     await fillAddress()

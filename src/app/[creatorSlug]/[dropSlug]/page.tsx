@@ -101,7 +101,6 @@ export default async function PublicDropPage({ params }: Props) {
             <BuyForm dropId={drop.id} productPriceCents={productPriceCents} />
 
             <div className="space-y-1 text-sm text-muted-foreground">
-              <p>Printed &amp; shipped in 3–5 business days.</p>
               <p>
                 Support:{" "}
                 <a href={`mailto:${drop.supportEmail}`} className="underline">

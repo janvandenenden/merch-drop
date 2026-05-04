@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
@@ -44,8 +45,10 @@ function formatCents(cents: number) {
 
 export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
   const [step, setStep] = useState<Step>("details")
+  const [isMultiBuy, setIsMultiBuy] = useState(false)
+  const [isAddressOpen, setIsAddressOpen] = useState(false)
   const [sizeQtys, setSizeQtys] = useState<Record<Size, number>>({
-    S: 0, M: 0, L: 0, XL: 0, "2XL": 0,
+    S: 0, M: 1, L: 0, XL: 0, "2XL": 0,
   })
   const [address, setAddress] = useState<Address>({
     name: "",
@@ -72,10 +75,23 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
     }))
   }
 
+  function selectSingleSize(size: Size) {
+    setSizeQtys({ S: 0, M: 0, L: 0, XL: 0, "2XL": 0, [size]: 1 })
+  }
+
+  function toggleMultiBuy(nextValue: boolean) {
+    setIsMultiBuy(nextValue)
+    if (!nextValue) {
+      const selectedSize = SIZES.find((size) => sizeQtys[size] > 0) ?? "M"
+      selectSingleSize(selectedSize)
+    }
+  }
+
   const selectedItems: OrderItem[] = SIZES.flatMap((size) =>
     sizeQtys[size] > 0 ? [{ size, quantity: sizeQtys[size] }] : [],
   )
   const totalQuantity = selectedItems.reduce((sum, i) => sum + i.quantity, 0)
+  const singleSize = selectedItems[0]?.size ?? "M"
 
   const hasAddress = Boolean(
     address.name.trim() &&
@@ -140,101 +156,150 @@ export function BuyForm({ dropId, productPriceCents }: BuyFormProps) {
         }}
       >
         <div className="rounded-md bg-muted/40 px-4 py-3">
-          <p className="text-sm text-muted-foreground">Product</p>
-          <p className="text-lg font-semibold">{formatCents(productPriceCents)} each + shipping</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">T-shirt</p>
+            <p className="text-lg font-semibold">{formatCents(productPriceCents)}</p>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">Shipping calculated after address.</p>
         </div>
 
         <div className="rounded-md border border-border px-4 py-3">
-          <p className="mb-3 text-sm font-medium">Size &amp; quantity</p>
-          <div className="flex flex-col gap-2">
-            {SIZES.map((size) => (
-              <div key={size} className="flex items-center justify-between gap-3">
-                <span className="w-10 text-sm font-medium">{size}</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    aria-label={`Decrease ${size} quantity`}
-                    onClick={() => setQty(size, -1)}
-                    disabled={sizeQtys[size] === 0}
-                    className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40"
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm font-medium" aria-label={`${size} quantity`}>{sizeQtys[size]}</span>
-                  <button
-                    type="button"
-                    aria-label={`Increase ${size} quantity`}
-                    onClick={() => setQty(size, 1)}
-                    disabled={sizeQtys[size] >= 10}
-                    className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Size</p>
+              <p className="text-sm text-muted-foreground">
+                {isMultiBuy ? "Choose quantities by size." : "One shirt selected."}
+              </p>
+            </div>
+            <label htmlFor="buy-multiple" className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Checkbox
+                id="buy-multiple"
+                checked={isMultiBuy}
+                onCheckedChange={(checked) => toggleMultiBuy(checked === true)}
+              />
+              Buy multiple
+            </label>
           </div>
-          {totalQuantity > 0 && (
-            <p className="mt-3 text-sm text-muted-foreground">
-              {totalQuantity} shirt{totalQuantity !== 1 ? "s" : ""} · {formatCents(productPriceCents * totalQuantity)} + shipping
-            </p>
+
+          {isMultiBuy ? (
+            <div className="flex flex-col gap-2">
+              {SIZES.map((size) => (
+                <div key={size} className="flex items-center justify-between gap-3">
+                  <span className="w-10 text-sm font-medium">{size}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label={`Decrease ${size} quantity`}
+                      onClick={() => setQty(size, -1)}
+                      disabled={sizeQtys[size] === 0}
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40"
+                    >
+                      -
+                    </button>
+                    <span className="w-6 text-center text-sm font-medium" aria-label={`${size} quantity`}>
+                      {sizeQtys[size]}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Increase ${size} quantity`}
+                      onClick={() => setQty(size, 1)}
+                      disabled={sizeQtys[size] >= 10}
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-sm hover:bg-muted disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-5 gap-2">
+              {SIZES.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  aria-pressed={singleSize === size}
+                  onClick={() => selectSingleSize(size)}
+                  className={`h-10 rounded-md border text-sm font-medium transition-colors ${
+                    singleSize === size
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
           )}
+
+          <p className="mt-3 text-sm text-muted-foreground">
+            {totalQuantity} shirt{totalQuantity !== 1 ? "s" : ""} selected
+          </p>
         </div>
 
         <div className="rounded-md border border-border">
-          <div className="px-4 py-3">
-            <p className="text-sm font-medium">Shipping address</p>
-            {hasAddress && (
+          <button
+            type="button"
+            aria-label={isAddressOpen ? "Hide shipping address" : "Add shipping address"}
+            aria-expanded={isAddressOpen}
+            onClick={() => setIsAddressOpen((value) => !value)}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+          >
+            <div>
+              <p className="text-sm font-medium">Shipping address</p>
               <p className="text-sm text-muted-foreground">
-                {address.city}, {address.countryCode}
+                {hasAddress ? `${address.city}, ${address.countryCode}` : "Add destination for rates."}
               </p>
-            )}
-          </div>
-          <div className="grid gap-3 border-t border-border px-4 py-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="name">Full name</Label>
-              <Input id="name" value={address.name} onChange={(e) => patch("name", e.target.value)} />
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="address1">Address</Label>
-              <Input
-                id="address1"
-                value={address.address1}
-                onChange={(e) => patch("address1", e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+            <span className="text-sm text-muted-foreground">{isAddressOpen ? "Hide" : "Add"}</span>
+          </button>
+          {isAddressOpen && (
+            <div className="grid gap-3 border-t border-border px-4 py-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="city">City</Label>
-                <Input id="city" value={address.city} onChange={(e) => patch("city", e.target.value)} />
+                <Label htmlFor="name">Full name</Label>
+                <Input id="name" value={address.name} onChange={(e) => patch("name", e.target.value)} />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="zip">ZIP / Postal</Label>
-                <Input id="zip" value={address.zip} onChange={(e) => patch("zip", e.target.value)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1.5">
-                <Label htmlFor="stateCode">State / Province</Label>
+                <Label htmlFor="address1">Address</Label>
                 <Input
-                  id="stateCode"
-                  placeholder="Optional"
-                  value={address.stateCode}
-                  onChange={(e) => patch("stateCode", e.target.value)}
+                  id="address1"
+                  value={address.address1}
+                  onChange={(e) => patch("address1", e.target.value)}
                 />
               </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="countryCode">Country code</Label>
-                <Input
-                  id="countryCode"
-                  placeholder="US, GB, DE…"
-                  maxLength={2}
-                  value={address.countryCode}
-                  onChange={(e) => patch("countryCode", e.target.value.toUpperCase())}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="city">City</Label>
+                  <Input id="city" value={address.city} onChange={(e) => patch("city", e.target.value)} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="zip">ZIP / Postal</Label>
+                  <Input id="zip" value={address.zip} onChange={(e) => patch("zip", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="stateCode">State / Province</Label>
+                  <Input
+                    id="stateCode"
+                    placeholder="Optional"
+                    value={address.stateCode}
+                    onChange={(e) => patch("stateCode", e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="countryCode">Country code</Label>
+                  <Input
+                    id="countryCode"
+                    placeholder="US, GB, DE..."
+                    maxLength={2}
+                    value={address.countryCode}
+                    onChange={(e) => patch("countryCode", e.target.value.toUpperCase())}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
