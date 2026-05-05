@@ -1,110 +1,111 @@
-import Link from "next/link"
-import { redirect } from "next/navigation"
-import { headers } from "next/headers"
-import { Pencil } from "lucide-react"
-import { auth } from "@/lib/auth"
-import { listDrops } from "@/lib/drops"
-import { APP_CONTENT_CLASS, APP_PAGE_CLASS } from "@/lib/layout"
-import { getDropStatsForCreator } from "@/lib/orders"
-import { getSignedUrl } from "@/lib/storage"
-import { DropStatusDialog } from "@/components/drops/drop-actions"
-import { PublicLinkActions } from "@/components/drops/public-link-actions"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import type { Drop } from "@/lib/drops"
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { Pencil } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { listDrops } from "@/lib/drops";
+import { APP_CONTENT_CLASS, APP_PAGE_CLASS } from "@/lib/layout";
+import { getDropStatsForCreator } from "@/lib/orders";
+import { getSignedUrl } from "@/lib/storage";
+import { DropStatusDialog } from "@/components/drops/drop-actions";
+import { DashboardDropPrimaryAction } from "@/components/drops/dashboard-drop-primary-action";
+import { PublicLinkActions } from "@/components/drops/public-link-actions";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import type { Drop } from "@/lib/drops";
 
-type StatusFilter = "all" | "live" | "non-live"
-type DashboardSearchParams = Promise<{ status?: string | string[] }>
-type DropImage = { url: string | null; label: string }
+type StatusFilter = "all" | "live" | "non-live";
+type DashboardSearchParams = Promise<{ status?: string | string[] }>;
+type DropImage = { url: string | null; label: string };
 
-const BASE_URL = process.env.NEXT_PUBLIC_URL ?? "https://merch-drop.com"
+const BASE_URL = process.env.NEXT_PUBLIC_URL ?? "https://merch-drop.com";
 
 const FILTER_LABELS: Record<StatusFilter, string> = {
   all: "All",
   live: "Live",
   "non-live": "Non-live",
-}
+};
 
 function parseStatusFilter(value: string | string[] | undefined): StatusFilter {
-  const status = Array.isArray(value) ? value[0] : value
-  return status === "live" || status === "non-live" ? status : "all"
+  const status = Array.isArray(value) ? value[0] : value;
+  return status === "live" || status === "non-live" ? status : "all";
 }
 
 function filterDrops(drops: Drop[], statusFilter: StatusFilter): Drop[] {
   if (statusFilter === "live")
-    return drops.filter((drop) => drop.status === "live")
+    return drops.filter((drop) => drop.status === "live");
   if (statusFilter === "non-live")
-    return drops.filter((drop) => drop.status !== "live")
-  return drops
+    return drops.filter((drop) => drop.status !== "live");
+  return drops;
 }
 
 function filterHref(statusFilter: StatusFilter) {
   return statusFilter === "all"
     ? "/dashboard"
-    : `/dashboard?status=${statusFilter}`
+    : `/dashboard?status=${statusFilter}`;
 }
 
 function formatCents(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`
+  return `$${(cents / 100).toFixed(2)}`;
 }
 
 async function getSignedDropImage(
   key: string,
-  label: string
+  label: string,
 ): Promise<DropImage | null> {
   try {
-    return { url: await getSignedUrl(key), label }
+    return { url: await getSignedUrl(key), label };
   } catch {
-    return null
+    return null;
   }
 }
 
 async function getDropImage(drop: Drop): Promise<DropImage> {
   if (drop.mockupKey) {
-    const mockup = await getSignedDropImage(drop.mockupKey, "Mockup")
-    if (mockup) return mockup
+    const mockup = await getSignedDropImage(drop.mockupKey, "Mockup");
+    if (mockup) return mockup;
   }
 
-  if (drop.mockupUrl) return { url: drop.mockupUrl, label: "Mockup" }
+  if (drop.mockupUrl) return { url: drop.mockupUrl, label: "Mockup" };
 
   if (drop.designFileKey) {
-    const design = await getSignedDropImage(drop.designFileKey, "Design")
-    if (design) return design
-    return { url: null, label: "Design unavailable" }
+    const design = await getSignedDropImage(drop.designFileKey, "Design");
+    if (design) return design;
+    return { url: null, label: "Design unavailable" };
   }
 
-  return { url: null, label: "No design" }
+  return { url: null, label: "No design" };
 }
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: DashboardSearchParams
+  searchParams: DashboardSearchParams;
 }) {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session) redirect("/login")
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/login");
 
-  const { user } = session
-  const statusFilter = parseStatusFilter((await searchParams).status)
+  const { user } = session;
+  const statusFilter = parseStatusFilter((await searchParams).status);
   const [drops, dropStats] = await Promise.all([
     listDrops(user.id),
     getDropStatsForCreator(user.id),
-  ])
-  const statsMap = new Map(dropStats.map((s) => [s.dropId, s]))
-  const needsStripe = !user.chargesEnabled
+  ]);
+  const statsMap = new Map(dropStats.map((s) => [s.dropId, s]));
+  const needsStripe = !user.chargesEnabled;
 
-  const visibleDrops = filterDrops(drops, statusFilter)
+  const visibleDrops = filterDrops(drops, statusFilter);
   const imageEntries = await Promise.all(
     visibleDrops.map(
-      async (drop) => [drop.id, await getDropImage(drop)] as const
-    )
-  )
-  const imageMap = new Map(imageEntries)
+      async (drop) => [drop.id, await getDropImage(drop)] as const,
+    ),
+  );
+  const imageMap = new Map(imageEntries);
 
   function renderDropRow(drop: Drop) {
-    const shareUrl = `${BASE_URL}/${user.slug}/${drop.slug}`
-    const stats = statsMap.get(drop.id)
-    const image = imageMap.get(drop.id) ?? { url: null, label: "No design" }
+    const shareUrl = `${BASE_URL}/${user.slug}/${drop.slug}`;
+    const stats = statsMap.get(drop.id);
+    const image = imageMap.get(drop.id) ?? { url: null, label: "No design" };
 
     return (
       <tr key={drop.id} className="border-b last:border-0">
@@ -148,32 +149,32 @@ export default async function DashboardPage({
           )}
         </td>
         <td className="px-4 py-3 align-middle">
-          <DropStatusDialog drop={drop} chargesEnabled={!!user.chargesEnabled} />
+          <DropStatusDialog
+            drop={drop}
+            chargesEnabled={!!user.chargesEnabled}
+          />
         </td>
         <td className="min-w-64 px-4 py-3 align-middle">
           <PublicLinkActions href={shareUrl} />
         </td>
         <td className="px-4 py-3 align-middle">
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              variant="default"
-              size="sm"
-              nativeButton={false}
-              render={<Link href={`/dashboard/orders?drop=${drop.id}`} />}
-            >
-              Orders
-              {stats && stats.orderCount > 0 ? ` (${stats.orderCount})` : ""}
-            </Button>
+            <DashboardDropPrimaryAction
+              dropId={drop.id}
+              status={drop.status}
+              chargesEnabled={!!user.chargesEnabled}
+              orderCount={stats?.orderCount}
+            />
           </div>
         </td>
       </tr>
-    )
+    );
   }
 
   function renderMobileDrop(drop: Drop) {
-    const shareUrl = `${BASE_URL}/${user.slug}/${drop.slug}`
-    const stats = statsMap.get(drop.id)
-    const image = imageMap.get(drop.id) ?? { url: null, label: "No design" }
+    const shareUrl = `${BASE_URL}/${user.slug}/${drop.slug}`;
+    const stats = statsMap.get(drop.id);
+    const image = imageMap.get(drop.id) ?? { url: null, label: "No design" };
 
     return (
       <div key={drop.id} className="border-b p-4 last:border-0">
@@ -211,7 +212,10 @@ export default async function DashboardPage({
                   </Button>
                 )}
               </div>
-              <DropStatusDialog drop={drop} chargesEnabled={!!user.chargesEnabled} />
+              <DropStatusDialog
+                drop={drop}
+                chargesEnabled={!!user.chargesEnabled}
+              />
             </div>
             <PublicLinkActions href={shareUrl} />
             {stats && stats.orderCount > 0 && (
@@ -223,25 +227,22 @@ export default async function DashboardPage({
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            variant="default"
-            size="sm"
-            nativeButton={false}
-            render={<Link href={`/dashboard/orders?drop=${drop.id}`} />}
-          >
-            Orders
-            {stats && stats.orderCount > 0 ? ` (${stats.orderCount})` : ""}
-          </Button>
+          <DashboardDropPrimaryAction
+            dropId={drop.id}
+            status={drop.status}
+            chargesEnabled={!!user.chargesEnabled}
+            orderCount={stats?.orderCount}
+          />
         </div>
       </div>
-    )
+    );
   }
 
   function renderFilterTabs() {
     return (
       <div className="flex rounded-md border bg-background p-1">
         {(Object.keys(FILTER_LABELS) as StatusFilter[]).map((filter) => {
-          const isActive = filter === statusFilter
+          const isActive = filter === statusFilter;
           return (
             <Link
               key={filter}
@@ -254,10 +255,10 @@ export default async function DashboardPage({
             >
               {FILTER_LABELS[filter]}
             </Link>
-          )
+          );
         })}
       </div>
-    )
+    );
   }
 
   function renderDropsTable() {
@@ -268,7 +269,7 @@ export default async function DashboardPage({
             No {FILTER_LABELS[statusFilter].toLowerCase()} drops.
           </CardContent>
         </Card>
-      )
+      );
     }
 
     return (
@@ -289,7 +290,7 @@ export default async function DashboardPage({
         </div>
         <div className="md:hidden">{visibleDrops.map(renderMobileDrop)}</div>
       </Card>
-    )
+    );
   }
 
   function renderEmptyState() {
@@ -302,7 +303,7 @@ export default async function DashboardPage({
           </Button>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -343,5 +344,5 @@ export default async function DashboardPage({
         {drops.length === 0 ? renderEmptyState() : renderDropsTable()}
       </div>
     </main>
-  )
+  );
 }
