@@ -75,8 +75,9 @@ describe("compositePrintFile", () => {
       .raw()
       .toBuffer({ resolveWithObject: true });
 
-    // pixel at (50, 50): offset = (50 * 1800 + 50) * 4
-    const offset = (50 * 1800 + 50) * 4;
+    // pixel at (50, 50): offset = (50 * PRINT_CANVAS.width + 50) * 4
+    const { PRINT_CANVAS } = await import("../lib/compositor");
+    const offset = (50 * PRINT_CANVAS.width + 50) * 4;
     expect(data[offset]).toBe(255); // R
     expect(data[offset + 1]).toBe(0); // G
     expect(data[offset + 2]).toBe(0); // B
@@ -96,7 +97,8 @@ describe("compositePrintFile", () => {
       .raw()
       .toBuffer({ resolveWithObject: true });
 
-    const offset = (650 * 1800 + 550) * 4;
+    const { PRINT_CANVAS: PC } = await import("../lib/compositor");
+    const offset = (650 * PC.width + 550) * 4;
     expect(data[offset]).toBe(255);
     expect(data[offset + 1]).toBe(0);
     expect(data[offset + 2]).toBe(0);
@@ -134,6 +136,37 @@ describe("compositePrintFile", () => {
     expect(mockDownloadFile).toHaveBeenCalledWith("designs/my-design.png");
   });
 
+  it("does not throw when scaled design exceeds canvas bounds (large PNG)", async () => {
+    // 100×100 design at scale=30 → 3000×3000, larger than 2250 canvas width
+    const design = await makePng(100, 100);
+    mockDownloadFile.mockResolvedValue(design);
+    mockUploadFile.mockResolvedValue(undefined);
+
+    const { compositePrintFile, PRINT_CANVAS } = await import("../lib/compositor");
+    await expect(
+      compositePrintFile("designs/large.png", { x: 0, y: 0, scale: 30, rotate: 0 })
+    ).resolves.not.toThrow();
+
+    const uploaded: Buffer = mockUploadFile.mock.calls[0][1];
+    const meta = await sharp(uploaded).metadata();
+    expect(meta.width).toBe(PRINT_CANVAS.width);
+    expect(meta.height).toBe(PRINT_CANVAS.height);
+  });
+
+  it("design placed partially outside canvas (negative offset) composites correctly", async () => {
+    const design = await makePng(100, 100);
+    mockDownloadFile.mockResolvedValue(design);
+    mockUploadFile.mockResolvedValue(undefined);
+
+    const { compositePrintFile, PRINT_CANVAS } = await import("../lib/compositor");
+    await compositePrintFile("designs/test.png", { x: -50, y: -50, scale: 1, rotate: 0 });
+
+    const uploaded: Buffer = mockUploadFile.mock.calls[0][1];
+    const meta = await sharp(uploaded).metadata();
+    expect(meta.width).toBe(PRINT_CANVAS.width);
+    expect(meta.height).toBe(PRINT_CANVAS.height);
+  });
+
   it("applies rotation — 90° rotate swaps image dimensions before composite", async () => {
     // 200×100 image rotated 90° becomes 100×200
     const design = await makePng(200, 100);
@@ -146,7 +179,8 @@ describe("compositePrintFile", () => {
     const uploaded: Buffer = mockUploadFile.mock.calls[0][1];
     const meta = await sharp(uploaded).metadata();
     // Canvas is always PRINT_CANVAS size regardless of rotation
-    expect(meta.width).toBe(1800);
-    expect(meta.height).toBe(2400);
+    const { PRINT_CANVAS: ROT_CANVAS } = await import("../lib/compositor");
+    expect(meta.width).toBe(ROT_CANVAS.width);
+    expect(meta.height).toBe(ROT_CANVAS.height);
   });
 });

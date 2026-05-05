@@ -122,7 +122,7 @@ export async function submitOrder(params: SubmitOrderParams): Promise<PrintfulOr
         items: params.items.map((item) => ({
           variant_id: item.variantId,
           quantity: item.quantity,
-          files: [{ type: "front", url: item.printFileUrl }],
+          files: [{ type: "front_large", url: item.printFileUrl }],
         })),
       }),
     },
@@ -156,13 +156,13 @@ export async function generatePrintfulMockupUrl(
         variant_ids: variantIds,
         files: [
           {
-            placement: "front",
+            placement: "front_large",
             image_url: printFileUrl,
             position: {
-              area_width: 1800,
-              area_height: 2400,
-              width: 1800,
-              height: 2400,
+              area_width: 2250,
+              area_height: 2700,
+              width: 2250,
+              height: 2700,
               top: 0,
               left: 0,
             },
@@ -184,7 +184,7 @@ export async function generatePrintfulMockupUrl(
       )
 
       if (result.status === "completed") {
-        const url = result.mockups?.find((m) => m.placement === "front")?.mockup_url
+        const url = result.mockups?.find((m) => m.placement === "front_large")?.mockup_url
         if (!url) throw new PrintfulError(0, "no_mockup", "No front mockup in Printful response")
         return url
       }
