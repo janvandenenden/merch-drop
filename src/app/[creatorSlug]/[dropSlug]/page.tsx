@@ -5,13 +5,6 @@ import { APP_CONTENT_CLASS, PAGE_MIN_HEIGHT_CLASS } from "@/lib/layout";
 import { getSignedUrl } from "@/lib/storage";
 import { fixedProductPrice } from "@/lib/pricing";
 import { BuyForm } from "@/components/drops/buy-form";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 
 interface Props {
   params: Promise<{ creatorSlug: string; dropSlug: string }>;
@@ -24,58 +17,6 @@ export default async function PublicDropPage({ params }: Props) {
 
   const { drop } = result;
   const mockupUrl = drop.mockupKey ? await getSignedUrl(drop.mockupKey) : null;
-
-  if (drop.status === "ready" || drop.status === "paused") {
-    return (
-      <main
-        className={`${PAGE_MIN_HEIGHT_CLASS} flex items-center justify-center p-8`}
-      >
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <CardTitle className="text-2xl">{drop.title}</CardTitle>
-            <CardDescription>Coming soon</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              This drop isn&apos;t live yet. Check back soon.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Questions?{" "}
-              <a href={`mailto:${drop.supportEmail}`} className="underline">
-                {drop.supportEmail}
-              </a>
-            </p>
-          </CardContent>
-        </Card>
-      </main>
-    );
-  }
-
-  if (drop.status === "closed") {
-    return (
-      <main
-        className={`${PAGE_MIN_HEIGHT_CLASS} flex items-center justify-center p-8`}
-      >
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <CardTitle className="text-2xl">{drop.title}</CardTitle>
-            <CardDescription>Drop closed</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              This drop is no longer available.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Questions?{" "}
-              <a href={`mailto:${drop.supportEmail}`} className="underline">
-                {drop.supportEmail}
-              </a>
-            </p>
-          </CardContent>
-        </Card>
-      </main>
-    );
-  }
 
   const productPriceCents = fixedProductPrice(drop.markupCents);
 
@@ -110,7 +51,11 @@ export default async function PublicDropPage({ params }: Props) {
               )}
             </div>
 
-            <BuyForm dropId={drop.id} productPriceCents={productPriceCents} />
+            <BuyForm
+              dropId={drop.id}
+              productPriceCents={productPriceCents}
+              availability={drop.status}
+            />
 
             <div className="space-y-1 text-sm text-muted-foreground">
               <p>

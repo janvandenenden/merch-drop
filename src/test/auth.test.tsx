@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,7 +13,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // ---------------------------------------------------------------------------
 
 const mockPush = vi.fn();
-let mockSearchParams = new URLSearchParams("email=test%40example.com&slug=my-store");
+let mockSearchParams = new URLSearchParams(
+  "email=test%40example.com&slug=my-store",
+);
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
@@ -108,10 +116,10 @@ describe("SignupPage", () => {
       expect(mockSendVerificationOtp).toHaveBeenCalledWith({
         email: "test@example.com",
         type: "sign-in",
-      })
+      }),
     );
     expect(mockPush).toHaveBeenCalledWith(
-      expect.stringContaining("/verify?email=")
+      expect.stringContaining("/verify?email="),
     );
     expect(mockPush).toHaveBeenCalledWith(expect.stringContaining("slug="));
   });
@@ -155,10 +163,10 @@ describe("LoginPage", () => {
       expect(mockSendVerificationOtp).toHaveBeenCalledWith({
         email: "test@example.com",
         type: "sign-in",
-      })
+      }),
     );
     expect(mockPush).toHaveBeenCalledWith(
-      expect.stringContaining("/verify?email=")
+      expect.stringContaining("/verify?email="),
     );
     expect(mockPush).not.toHaveBeenCalledWith(expect.stringContaining("slug="));
   });
@@ -171,7 +179,9 @@ describe("LoginPage", () => {
 describe("VerifyPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mockSearchParams = new URLSearchParams("email=test%40example.com&slug=my-store");
+    mockSearchParams = new URLSearchParams(
+      "email=test%40example.com&slug=my-store",
+    );
   });
   afterEach(cleanup);
 
@@ -186,7 +196,10 @@ describe("VerifyPage", () => {
   });
 
   it("shows error on invalid OTP", async () => {
-    mockSignIn.emailOtp.mockResolvedValue({ data: null, error: { message: "Invalid code" } });
+    mockSignIn.emailOtp.mockResolvedValue({
+      data: null,
+      error: { message: "Invalid code" },
+    });
     await renderVerify();
     await userEvent.type(screen.getByLabelText("Code"), "000000");
     fireEvent.click(screen.getByRole("button", { name: /verify/i }));
@@ -203,7 +216,7 @@ describe("VerifyPage", () => {
       expect(mockSignIn.emailOtp).toHaveBeenCalledWith({
         email: "test@example.com",
         otp: "123456",
-      })
+      }),
     );
     expect(mockUpdateUser).toHaveBeenCalledWith({ slug: "my-store" });
     expect(mockPush).toHaveBeenCalledWith("/dashboard");
@@ -217,5 +230,23 @@ describe("VerifyPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /verify/i }));
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/dashboard"));
     expect(mockUpdateUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("AuthLayout", () => {
+  afterEach(cleanup);
+
+  it("renders the shared brand and form panels around its children", async () => {
+    const { default: AuthLayout } = await import("@/app/(auth)/layout");
+    render(
+      <AuthLayout>
+        <div>Child content</div>
+      </AuthLayout>,
+    );
+
+    expect(screen.getByTestId("auth-brand-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("auth-form-panel")).toHaveTextContent(
+      "Child content",
+    );
   });
 });
