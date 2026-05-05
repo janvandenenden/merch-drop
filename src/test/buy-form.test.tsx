@@ -1,17 +1,26 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 beforeEach(() => {
-  vi.clearAllMocks()
-  global.fetch = vi.fn()
-})
+  vi.clearAllMocks();
+  global.fetch = vi.fn();
+});
 
-afterEach(cleanup)
+afterEach(cleanup);
 
-async function renderForm(productPriceCents = 3405) {
-  const { BuyForm } = await import("@/components/drops/buy-form")
-  render(<BuyForm dropId="drop-1" productPriceCents={productPriceCents} />)
+async function renderForm(
+  productPriceCents = 3405,
+  availability: "live" | "ready" | "paused" | "closed" = "live",
+) {
+  const { BuyForm } = await import("@/components/drops/buy-form");
+  render(
+    <BuyForm
+      dropId="drop-1"
+      productPriceCents={productPriceCents}
+      availability={availability}
+    />,
+  );
 }
 
 const SHIPPING_RATES_RESPONSE = {
@@ -26,270 +35,411 @@ const SHIPPING_RATES_RESPONSE = {
     },
   ],
   fulfillmentCents: 1350,
-}
+};
 
 async function fillAddress() {
-  const addressToggle = screen.getByRole("button", { name: /shipping address/i })
+  const addressToggle = screen.getByRole("button", {
+    name: /shipping address/i,
+  });
   if (addressToggle.getAttribute("aria-expanded") === "false") {
-    await userEvent.click(addressToggle)
+    await userEvent.click(addressToggle);
   }
-  await userEvent.type(screen.getByLabelText("Full name"), "Jane Doe")
-  await userEvent.type(screen.getByLabelText("Address"), "1 Main St")
-  await userEvent.type(screen.getByLabelText("City"), "Portland")
-  await userEvent.type(screen.getByLabelText("ZIP / Postal"), "97201")
-  await userEvent.type(screen.getByLabelText("Country code"), "US")
+  await userEvent.type(screen.getByLabelText("Full name"), "Jane Doe");
+  await userEvent.type(screen.getByLabelText("Address"), "1 Main St");
+  await userEvent.type(screen.getByLabelText("City"), "Portland");
+  await userEvent.type(screen.getByLabelText("ZIP / Postal"), "97201");
+  await userEvent.type(screen.getByLabelText("Country code"), "US");
 }
 
 async function goToShippingStep(size = "L") {
   vi.mocked(global.fetch).mockResolvedValueOnce(
     new Response(JSON.stringify(SHIPPING_RATES_RESPONSE), { status: 200 }),
-  )
+  );
 
-  await userEvent.click(screen.getByRole("button", { name: size }))
-  await fillAddress()
-  await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
-  await screen.findByText(/standard/i)
+  await userEvent.click(screen.getByRole("button", { name: size }));
+  await fillAddress();
+  await userEvent.click(
+    screen.getByRole("button", { name: /calculate shipping/i }),
+  );
+  await screen.findByText(/standard/i);
 }
 
 // ─── Rendering ────────────────────────────────────────────────────────────────
 
 describe("BuyForm rendering", () => {
   it("renders all five sizes as buttons", async () => {
-    await renderForm()
+    await renderForm();
     for (const size of ["S", "M", "L", "XL", "2XL"]) {
-      expect(screen.getByRole("button", { name: size })).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: size })).toBeInTheDocument();
     }
-  })
+  });
 
   it("shows the fixed product price on the details step", async () => {
-    await renderForm(2850)
-    expect(screen.getByText("$28.50")).toBeInTheDocument()
-    expect(screen.getByText("Shipping calculated after address.")).toBeInTheDocument()
-  })
+    await renderForm(2850);
+    expect(screen.getByText("$28.50")).toBeInTheDocument();
+    expect(
+      screen.getByText("Shipping calculated after address."),
+    ).toBeInTheDocument();
+  });
 
   it("defaults to one medium shirt", async () => {
-    await renderForm()
-    expect(screen.getByRole("button", { name: "M" })).toHaveAttribute("aria-pressed", "true")
-    expect(screen.getByText(/1 shirt/)).toBeInTheDocument()
-  })
+    await renderForm();
+    expect(screen.getByRole("button", { name: "M" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByText(/1 shirt/)).toBeInTheDocument();
+  });
 
   it("calculate shipping button is disabled before an address is added", async () => {
-    await renderForm()
-    expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
-  })
+    await renderForm();
+    expect(
+      screen.getByRole("button", { name: /calculate shipping/i }),
+    ).toBeDisabled();
+  });
 
   it("keeps the quantity grid hidden by default", async () => {
-    await renderForm()
-    expect(screen.queryByRole("button", { name: "Decrease L quantity" })).not.toBeInTheDocument()
-  })
-})
+    await renderForm();
+    expect(
+      screen.queryByRole("button", { name: "Decrease L quantity" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a disabled Coming soon CTA for ready drops", async () => {
+    await renderForm(3405, "ready");
+    expect(screen.getByRole("button", { name: /coming soon/i })).toBeDisabled();
+    expect(screen.getByText(/preview only/i)).toBeInTheDocument();
+  });
+
+  it("shows a disabled Sale paused CTA for paused drops", async () => {
+    await renderForm(3405, "paused");
+    expect(screen.getByRole("button", { name: /sale paused/i })).toBeDisabled();
+    expect(screen.getByText(/temporarily unavailable/i)).toBeInTheDocument();
+  });
+
+  it("shows a disabled Sale ended CTA for closed drops", async () => {
+    await renderForm(3405, "closed");
+    expect(screen.getByRole("button", { name: /sale ended/i })).toBeDisabled();
+    expect(screen.getByText(/no longer available/i)).toBeInTheDocument();
+  });
+});
 
 // ─── Size grid quantity controls ──────────────────────────────────────────────
 
 describe("size grid", () => {
   async function showMultiBuy() {
-    await userEvent.click(screen.getByRole("checkbox", { name: "Buy multiple" }))
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Buy multiple" }),
+    );
   }
 
   it("increments a size quantity", async () => {
-    await renderForm()
-    await showMultiBuy()
-    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
-    expect(screen.getByLabelText("M quantity")).toHaveTextContent("2")
-  })
+    await renderForm();
+    await showMultiBuy();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Increase M quantity" }),
+    );
+    expect(screen.getByLabelText("M quantity")).toHaveTextContent("2");
+  });
 
   it("decrements a size quantity", async () => {
-    await renderForm()
-    await showMultiBuy()
-    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
-    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
-    await userEvent.click(screen.getByRole("button", { name: "Decrease M quantity" }))
-    expect(screen.getByLabelText("M quantity")).toHaveTextContent("2")
-  })
+    await renderForm();
+    await showMultiBuy();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Increase M quantity" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Increase M quantity" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Decrease M quantity" }),
+    );
+    expect(screen.getByLabelText("M quantity")).toHaveTextContent("2");
+  });
 
   it("caps quantity at 10", async () => {
-    await renderForm()
-    await showMultiBuy()
+    await renderForm();
+    await showMultiBuy();
     for (let i = 0; i < 11; i++) {
-      await userEvent.click(screen.getByRole("button", { name: "Increase S quantity" }))
+      await userEvent.click(
+        screen.getByRole("button", { name: "Increase S quantity" }),
+      );
     }
-    expect(screen.getByLabelText("S quantity")).toHaveTextContent("10")
-    expect(screen.getByRole("button", { name: "Increase S quantity" })).toBeDisabled()
-  })
+    expect(screen.getByLabelText("S quantity")).toHaveTextContent("10");
+    expect(
+      screen.getByRole("button", { name: "Increase S quantity" }),
+    ).toBeDisabled();
+  });
 
   it("multiple sizes can have quantities simultaneously", async () => {
-    await renderForm()
-    await showMultiBuy()
-    await userEvent.click(screen.getByRole("button", { name: "Increase M quantity" }))
-    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
-    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
-    expect(screen.getByLabelText("M quantity")).toHaveTextContent("2")
-    expect(screen.getByLabelText("L quantity")).toHaveTextContent("2")
-  })
+    await renderForm();
+    await showMultiBuy();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Increase M quantity" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Increase L quantity" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Increase L quantity" }),
+    );
+    expect(screen.getByLabelText("M quantity")).toHaveTextContent("2");
+    expect(screen.getByLabelText("L quantity")).toHaveTextContent("2");
+  });
 
   it("shows selected shirt count when qty > 0", async () => {
-    await renderForm(3405)
-    await userEvent.click(screen.getByRole("checkbox", { name: "Buy multiple" }))
-    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
-    expect(screen.getByText("2 shirts selected")).toBeInTheDocument()
-    expect(screen.queryByText(/\$68\.10/)).not.toBeInTheDocument()
-  })
-})
+    await renderForm(3405);
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Buy multiple" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Increase L quantity" }),
+    );
+    expect(screen.getByText("2 shirts selected")).toBeInTheDocument();
+    expect(screen.queryByText(/\$68\.10/)).not.toBeInTheDocument();
+  });
+});
 
 // ─── Details step ─────────────────────────────────────────────────────────────
 
 describe("details step", () => {
   it("calculate shipping stays disabled with qty but no address", async () => {
-    await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "L" }))
-    expect(screen.getByRole("button", { name: /calculate shipping/i })).toBeDisabled()
-  })
+    await renderForm();
+    await userEvent.click(screen.getByRole("button", { name: "L" }));
+    expect(
+      screen.getByRole("button", { name: /calculate shipping/i }),
+    ).toBeDisabled();
+  });
 
   it("shipping address is collapsed until the buyer opens it", async () => {
-    await renderForm()
-    expect(screen.queryByLabelText("Full name")).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole("button", { name: /shipping address/i }))
-    expect(screen.getByLabelText("Full name")).toBeInTheDocument()
-  })
+    await renderForm();
+    expect(screen.queryByLabelText("Full name")).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: /shipping address/i }),
+    );
+    expect(screen.getByLabelText("Full name")).toBeInTheDocument();
+  });
 
   it("calculate shipping enabled when qty > 0 and address filled", async () => {
-    await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "L" }))
-    await fillAddress()
-    expect(screen.getByRole("button", { name: /calculate shipping/i })).not.toBeDisabled()
-  })
-})
+    await renderForm();
+    await userEvent.click(screen.getByRole("button", { name: "L" }));
+    await fillAddress();
+    expect(
+      screen.getByRole("button", { name: /calculate shipping/i }),
+    ).not.toBeDisabled();
+  });
+
+  it("does not enable the CTA for ready drops even after the address is filled", async () => {
+    await renderForm(3405, "ready");
+    await userEvent.click(screen.getByRole("button", { name: "L" }));
+    await fillAddress();
+    expect(screen.getByRole("button", { name: /coming soon/i })).toBeDisabled();
+  });
+});
 
 // ─── Shipping step ────────────────────────────────────────────────────────────
 
 describe("shipping step", () => {
   it("shows shipping rates after form is submitted", async () => {
-    await renderForm()
-    await goToShippingStep()
-    expect(screen.getByText(/standard/i)).toBeInTheDocument()
-    expect(screen.getAllByText("$5.99")).toHaveLength(2)
-  })
+    await renderForm();
+    await goToShippingStep();
+    expect(screen.getByText(/standard/i)).toBeInTheDocument();
+    expect(screen.getAllByText("$5.99")).toHaveLength(2);
+  });
 
   it("shows per-size breakdown rows on shipping step", async () => {
-    await renderForm(3405)
-    await goToShippingStep("L")
-    expect(screen.getByText("L × 1")).toBeInTheDocument()
-    expect(screen.getByText("$34.05")).toBeInTheDocument()
-  })
+    await renderForm(3405);
+    await goToShippingStep("L");
+    expect(screen.getByText("L × 1")).toBeInTheDocument();
+    expect(screen.getByText("$34.05")).toBeInTheDocument();
+  });
 
   it("shows multi-size breakdown when multiple sizes selected", async () => {
-    await renderForm(3405)
+    await renderForm(3405);
     vi.mocked(global.fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(SHIPPING_RATES_RESPONSE), { status: 200 }),
-    )
-    await userEvent.click(screen.getByRole("checkbox", { name: "Buy multiple" }))
-    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
-    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
-    await fillAddress()
-    await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
-    await screen.findByText(/standard/i)
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Buy multiple" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Increase L quantity" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Increase L quantity" }),
+    );
+    await fillAddress();
+    await userEvent.click(
+      screen.getByRole("button", { name: /calculate shipping/i }),
+    );
+    await screen.findByText(/standard/i);
 
-    expect(screen.getByText("M × 1")).toBeInTheDocument()
-    expect(screen.getByText("L × 2")).toBeInTheDocument()
+    expect(screen.getByText("M × 1")).toBeInTheDocument();
+    expect(screen.getByText("L × 2")).toBeInTheDocument();
     // total: (1 + 2) × $34.05 + $5.99 = $108.14
-    expect(screen.getByRole("button", { name: /buy.*\$108\.14/i })).toBeInTheDocument()
-  })
+    expect(
+      screen.getByRole("button", { name: /buy.*\$108\.14/i }),
+    ).toBeInTheDocument();
+  });
 
   it("shows error message when shipping rates fetch fails", async () => {
     vi.mocked(global.fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: "Check your address and try again." }), { status: 422 }),
-    )
-    await renderForm()
-    await userEvent.click(screen.getByRole("button", { name: "L" }))
-    await fillAddress()
-    await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
-    await screen.findByText("Check your address and try again.")
-  })
-})
+      new Response(
+        JSON.stringify({ error: "Check your address and try again." }),
+        { status: 422 },
+      ),
+    );
+    await renderForm();
+    await userEvent.click(screen.getByRole("button", { name: "L" }));
+    await fillAddress();
+    await userEvent.click(
+      screen.getByRole("button", { name: /calculate shipping/i }),
+    );
+    await screen.findByText("Check your address and try again.");
+  });
+});
 
 // ─── Checkout submission ──────────────────────────────────────────────────────
 
 describe("checkout submission", () => {
   it("POSTs items array to /api/shipping-rates", async () => {
-    await renderForm()
-    await goToShippingStep("L")
+    await renderForm();
+    await goToShippingStep("L");
 
-    const [url, init] = vi.mocked(global.fetch).mock.calls[0] as [string, RequestInit]
-    expect(url).toBe("/api/shipping-rates")
-    const body = JSON.parse(init.body as string)
-    expect(body.items).toEqual([{ size: "L", quantity: 1 }])
-    expect(body.address.name).toBe("Jane Doe")
-  })
+    const [url, init] = vi.mocked(global.fetch).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("/api/shipping-rates");
+    const body = JSON.parse(init.body as string);
+    expect(body.items).toEqual([{ size: "L", quantity: 1 }]);
+    expect(body.address.name).toBe("Jane Doe");
+  });
 
   it("POSTs items array to /api/checkout", async () => {
-    await renderForm()
-    await goToShippingStep("L")
+    await renderForm();
+    await goToShippingStep("L");
 
     vi.mocked(global.fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ url: "https://checkout.stripe.com/session" }), { status: 200 }),
-    )
-    await userEvent.click(screen.getByRole("button", { name: /buy/i }))
+      new Response(
+        JSON.stringify({ url: "https://checkout.stripe.com/session" }),
+        { status: 200 },
+      ),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /buy/i }));
 
     await waitFor(() => {
-      const checkoutCall = vi.mocked(global.fetch).mock.calls[1] as [string, RequestInit]
-      expect(checkoutCall[0]).toBe("/api/checkout")
-      const body = JSON.parse(checkoutCall[1].body as string)
-      expect(body.items).toEqual([{ size: "L", quantity: 1 }])
-      expect(body.fulfillmentCents).toBe(1350)
-      expect(body.selectedRate.id).toBe("STANDARD")
-    })
-  })
+      const checkoutCall = vi.mocked(global.fetch).mock.calls[1] as [
+        string,
+        RequestInit,
+      ];
+      expect(checkoutCall[0]).toBe("/api/checkout");
+      const body = JSON.parse(checkoutCall[1].body as string);
+      expect(body.items).toEqual([{ size: "L", quantity: 1 }]);
+      expect(body.fulfillmentCents).toBe(1350);
+      expect(body.selectedRate.id).toBe("STANDARD");
+    });
+  });
 
   it("POSTs all selected sizes in items array", async () => {
-    await renderForm()
+    await renderForm();
     vi.mocked(global.fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(SHIPPING_RATES_RESPONSE), { status: 200 }),
-    )
-    await userEvent.click(screen.getByRole("checkbox", { name: "Buy multiple" }))
-    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
-    await userEvent.click(screen.getByRole("button", { name: "Increase L quantity" }))
-    await fillAddress()
-    await userEvent.click(screen.getByRole("button", { name: /calculate shipping/i }))
-    await screen.findByText(/standard/i)
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "Buy multiple" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Increase L quantity" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Increase L quantity" }),
+    );
+    await fillAddress();
+    await userEvent.click(
+      screen.getByRole("button", { name: /calculate shipping/i }),
+    );
+    await screen.findByText(/standard/i);
 
     vi.mocked(global.fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ url: "https://checkout.stripe.com/session" }), { status: 200 }),
-    )
-    await userEvent.click(screen.getByRole("button", { name: /buy/i }))
+      new Response(
+        JSON.stringify({ url: "https://checkout.stripe.com/session" }),
+        { status: 200 },
+      ),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /buy/i }));
 
     await waitFor(() => {
-      const checkoutCall = vi.mocked(global.fetch).mock.calls[1] as [string, RequestInit]
-      const body = JSON.parse((checkoutCall[1] as RequestInit).body as string)
+      const checkoutCall = vi.mocked(global.fetch).mock.calls[1] as [
+        string,
+        RequestInit,
+      ];
+      const body = JSON.parse((checkoutCall[1] as RequestInit).body as string);
       expect(body.items).toEqual([
         { size: "M", quantity: 1 },
         { size: "L", quantity: 2 },
-      ])
-    })
-  })
+      ]);
+    });
+  });
 
   it("shows Redirecting… while awaiting checkout response", async () => {
-    await renderForm()
-    await goToShippingStep()
+    await renderForm();
+    await goToShippingStep();
 
-    let resolve!: (v: Response) => void
-    vi.mocked(global.fetch).mockReturnValueOnce(new Promise((r) => (resolve = r)))
-    await userEvent.click(screen.getByRole("button", { name: /buy/i }))
-    expect(await screen.findByRole("button", { name: /redirecting/i })).toBeInTheDocument()
+    let resolve!: (v: Response) => void;
+    vi.mocked(global.fetch).mockReturnValueOnce(
+      new Promise((r) => (resolve = r)),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /buy/i }));
+    expect(
+      await screen.findByRole("button", { name: /redirecting/i }),
+    ).toBeInTheDocument();
 
-    resolve(new Response(JSON.stringify({ url: "https://checkout.stripe.com/s" }), { status: 200 }))
-  })
+    resolve(
+      new Response(JSON.stringify({ url: "https://checkout.stripe.com/s" }), {
+        status: 200,
+      }),
+    );
+  });
 
   it("shows error and re-enables buy button if checkout fails", async () => {
-    await renderForm()
-    await goToShippingStep()
+    await renderForm();
+    await goToShippingStep();
 
     vi.mocked(global.fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ error: "failed" }), { status: 500 }),
-    )
-    await userEvent.click(screen.getByRole("button", { name: /buy/i }))
+    );
+    await userEvent.click(screen.getByRole("button", { name: /buy/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /buy/i })).not.toBeDisabled()
-    })
-  })
-})
+      expect(screen.getByRole("button", { name: /buy/i })).not.toBeDisabled();
+    });
+  });
+});
+
+// ─── Non-live preview mode ────────────────────────────────────────────────────
+
+describe("non-live preview mode", () => {
+  it("allows size selection changes for ready drops", async () => {
+    await renderForm(3405, "ready");
+    await userEvent.click(screen.getByRole("button", { name: "L" }));
+    expect(screen.getByRole("button", { name: "L" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("does not call shipping-rates for ready drops", async () => {
+    await renderForm(3405, "ready");
+    await fillAddress();
+    await userEvent.click(screen.getByRole("button", { name: /coming soon/i }));
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(screen.queryByText(/standard/i)).not.toBeInTheDocument();
+  });
+
+  it("does not render the shipping step for paused drops", async () => {
+    await renderForm(3405, "paused");
+    await fillAddress();
+    expect(screen.queryByText(/shipping method/i)).not.toBeInTheDocument();
+  });
+});
