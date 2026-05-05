@@ -17,6 +17,10 @@ export type CreateDropParams = {
   markupCents: number
   shirtColor?: string
   status?: "pre_live" | "live"
+  designFileKey?: string
+  printFileKey?: string
+  mockupKey?: string
+  placement?: { x: number; y: number; scale: number; rotate: number }
 }
 
 export type UpdateDropParams = {
@@ -73,6 +77,10 @@ export async function createDrop(params: CreateDropParams): Promise<Drop> {
       markupCents: params.markupCents,
       shirtColor: params.shirtColor ?? "white",
       status: params.status ?? "pre_live",
+      designFileKey: params.designFileKey,
+      printFileKey: params.printFileKey,
+      mockupKey: params.mockupKey,
+      placement: params.placement,
     })
     .returning()
 

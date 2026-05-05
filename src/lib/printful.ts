@@ -136,14 +136,14 @@ const mockupTaskSchema = z.looseObject({
 })
 
 const mockupResultSchema = z.looseObject({
-  status: z.enum(["pending", "completed", "failed"]),
+  status: z.string(),
   mockups: z
     .array(z.looseObject({ placement: z.string(), mockup_url: z.string().url() }))
     .optional(),
   error: z.string().optional(),
 })
 
-export async function generateMockup(
+export async function generatePrintfulMockupUrl(
   printFileUrl: string,
   variantIds: number[],
 ): Promise<string> {

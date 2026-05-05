@@ -6,6 +6,7 @@ import { PAGE_MIN_HEIGHT_CLASS } from "@/lib/layout"
 import { getSignedUrl } from "@/lib/storage"
 import { DesignStep } from "@/components/drops/design-step"
 
+// TODO: Remove this route after the combined /drops/new creation flow is verified in production.
 export default async function DesignPage({
   params,
 }: {
@@ -30,7 +31,9 @@ export default async function DesignPage({
         </div>
         <DesignStep
           dropId={id}
-          initialMockupUrl={drop.mockupKey ? await getSignedUrl(drop.mockupKey) : undefined}
+          initialMockupUrl={
+            drop.mockupKey ? await getSignedUrl(drop.mockupKey) : undefined
+          }
           locked={!!drop.firstSaleAt}
         />
       </div>

@@ -21,7 +21,7 @@ vi.mock("../lib/storage", () => ({
 }))
 
 const mockPrintfulGenerateMockup = vi.fn()
-vi.mock("../lib/printful", () => ({ generateMockup: mockPrintfulGenerateMockup }))
+vi.mock("../lib/printful", () => ({ generatePrintfulMockupUrl: mockPrintfulGenerateMockup }))
 
 beforeEach(() => {
   mockFindFirst.mockReset()

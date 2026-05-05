@@ -83,15 +83,21 @@ describe("computeEffectiveDPI", () => {
   const maxDPIScale = PRINT_AREA_PX_W / (MIN_DPI * PRINT_INCHES_W)
 
   it("returns exactly MIN_DPI at maxDPIScale", () => {
-    expect(computeEffectiveDPI(maxDPIScale, PRINT_AREA_PX_W)).toBeCloseTo(MIN_DPI)
+    expect(computeEffectiveDPI(maxDPIScale, PRINT_AREA_PX_W)).toBeCloseTo(
+      MIN_DPI,
+    )
   })
 
   it("returns higher DPI at half maxDPIScale (smaller design)", () => {
-    expect(computeEffectiveDPI(maxDPIScale / 2, PRINT_AREA_PX_W)).toBeCloseTo(MIN_DPI * 2)
+    expect(computeEffectiveDPI(maxDPIScale / 2, PRINT_AREA_PX_W)).toBeCloseTo(
+      MIN_DPI * 2,
+    )
   })
 
   it("returns lower DPI at double maxDPIScale (larger design)", () => {
-    expect(computeEffectiveDPI(maxDPIScale * 2, PRINT_AREA_PX_W)).toBeCloseTo(MIN_DPI / 2)
+    expect(computeEffectiveDPI(maxDPIScale * 2, PRINT_AREA_PX_W)).toBeCloseTo(
+      MIN_DPI / 2,
+    )
   })
 
   it("returns Infinity for scale 0", () => {
@@ -111,7 +117,7 @@ describe("computeEffectiveDPI", () => {
 // ---------------------------------------------------------------------------
 
 describe("computePrintedWidthIn", () => {
-  it("1800px image at fill scale prints at full print width (12\")", () => {
+  it('1800px image at fill scale prints at full print width (12")', () => {
     const fillScale = PRINT_AREA_PX_W / MIN_PX_W
     const inches = computePrintedWidthIn(MIN_PX_W, fillScale, PRINT_AREA_PX_W)
     expect(inches).toBeCloseTo(PRINT_INCHES_W)
@@ -149,7 +155,9 @@ describe("useDesignEditor — file validation", () => {
         dataTransfer: { files: [makeJpegFile()] },
       } as unknown as React.DragEvent)
     })
-    expect(result.current.uploadError).toBe("PNG files only. Please upload a .png file.")
+    expect(result.current.uploadError).toBe(
+      "PNG files only. Please upload a .png file.",
+    )
     expect(result.current.isOpen).toBe(false)
   })
 
@@ -260,7 +268,9 @@ describe("useDesignEditor — onFileChange callback", () => {
 
   it("fires onFileChange with the File when a valid PNG is dropped", async () => {
     const onFileChange = vi.fn()
-    const { result } = renderHook(() => useDesignEditor(undefined, onFileChange))
+    const { result } = renderHook(() =>
+      useDesignEditor(undefined, onFileChange),
+    )
     const file = makePngFile()
 
     await act(async () => {
@@ -276,7 +286,9 @@ describe("useDesignEditor — onFileChange callback", () => {
 
   it("does not fire onFileChange for non-PNG files", async () => {
     const onFileChange = vi.fn()
-    const { result } = renderHook(() => useDesignEditor(undefined, onFileChange))
+    const { result } = renderHook(() =>
+      useDesignEditor(undefined, onFileChange),
+    )
 
     await act(async () => {
       result.current.handleDrop({
@@ -290,7 +302,9 @@ describe("useDesignEditor — onFileChange callback", () => {
 
   it("fires onFileChange again when image is replaced", async () => {
     const onFileChange = vi.fn()
-    const { result } = renderHook(() => useDesignEditor(undefined, onFileChange))
+    const { result } = renderHook(() =>
+      useDesignEditor(undefined, onFileChange),
+    )
     const first = makePngFile()
     const second = new File(["png2"], "second.png", { type: "image/png" })
 
@@ -355,24 +369,38 @@ describe("DesignEditor — Save placement button respects resolution", () => {
     await uploadPng(container)
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Save placement" })).not.toBeDisabled()
+      expect(
+        screen.getByRole("button", { name: "Save placement" }),
+      ).not.toBeDisabled()
     })
+  })
+
+  it("opens a full-screen dialog in creation mode", async () => {
+    const { container } = render(<DesignEditor variant="creation" />)
+    await uploadPng(container)
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Place your design",
+    })
+    expect(dialog.className).toContain("100dvh")
   })
 
   it("disables Save placement when scale exceeds maxDPIScale (low resolution)", async () => {
     const { TransformWrapper } = await import("react-zoom-pan-pinch")
-    ;(TransformWrapper as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(
-      ({ onInit, children }: any) => {
-        onInit?.({ state: { scale: 1 } }) // scale=1 >> maxDPIScale → belowMinRes
-        return children
-      },
-    )
+    ;(
+      TransformWrapper as unknown as ReturnType<typeof vi.fn>
+    ).mockImplementationOnce(({ onInit, children }: any) => {
+      onInit?.({ state: { scale: 1 } }) // scale=1 >> maxDPIScale → belowMinRes
+      return children
+    })
 
     const { container } = render(<DesignEditor />)
     await uploadPng(container)
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Save placement" })).toBeDisabled()
+      expect(
+        screen.getByRole("button", { name: "Save placement" }),
+      ).toBeDisabled()
     })
   })
 })

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import {
   PrintfulError,
   estimateOrderCost,
-  generateMockup,
+  generatePrintfulMockupUrl,
   getShippingRates,
   submitOrder,
   type PrintfulOrder,
@@ -101,11 +101,11 @@ describe.skipIf(!hasPrintFile)("estimateOrderCost", () => {
 
 // ─── Generate mockup ──────────────────────────────────────────────────────────
 
-describe.skipIf(!hasPrintFile)("generateMockup", () => {
+describe.skipIf(!hasPrintFile)("generatePrintfulMockupUrl", () => {
   it(
     "returns a valid HTTPS mockup URL",
     async () => {
-      const url = await generateMockup(printFileUrl, [BC3001_WHITE_M])
+      const url = await generatePrintfulMockupUrl(printFileUrl, [BC3001_WHITE_M])
       expect(url).toMatch(/^https:\/\//)
     },
     120_000, // 60s poll + up to 30s rate limit backoff + buffer

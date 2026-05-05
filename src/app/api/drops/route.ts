@@ -4,12 +4,23 @@ import { z } from "zod"
 import { auth } from "@/lib/auth"
 import { createDrop } from "@/lib/drops"
 
+const placementSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  scale: z.number(),
+  rotate: z.number(),
+})
+
 const bodySchema = z.object({
   title: z.string().min(1),
   slug: z.string().optional(),
   description: z.string().optional(),
   supportEmail: z.string().email(),
   markupCents: z.number().int().min(0),
+  designFileKey: z.string().optional(),
+  printFileKey: z.string().optional(),
+  mockupKey: z.string().optional(),
+  placement: placementSchema.optional(),
 })
 
 export async function POST(request: Request) {
