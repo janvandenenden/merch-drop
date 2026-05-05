@@ -25,7 +25,7 @@ export default async function PublicDropPage({ params }: Props) {
   const { drop } = result;
   const mockupUrl = drop.mockupKey ? await getSignedUrl(drop.mockupKey) : null;
 
-  if (drop.status === "pre_live" || drop.status === "paused") {
+  if (drop.status === "ready" || drop.status === "paused") {
     return (
       <main
         className={`${PAGE_MIN_HEIGHT_CLASS} flex items-center justify-center p-8`}

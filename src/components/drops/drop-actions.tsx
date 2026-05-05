@@ -21,14 +21,14 @@ import {
 import type { Drop } from "@/lib/drops"
 
 const STATUS_LABELS: Record<Drop["status"], string> = {
-  pre_live: "Pre-live",
+  ready: "Ready",
   live: "Live",
   paused: "Paused",
   closed: "Closed",
 }
 
 const STATUS_CLASSES: Record<Drop["status"], string> = {
-  pre_live:
+  ready:
     "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
   live: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   paused:
@@ -66,7 +66,7 @@ export function DropStatusDialog({
   }
 
   const canGoLive =
-    (drop.status === "pre_live" && chargesEnabled) || drop.status === "paused"
+    (drop.status === "ready" && chargesEnabled) || drop.status === "paused"
   const canPause = drop.status === "live"
   const canClose = drop.status === "live" || drop.status === "paused"
   const canDelete = drop.status === "closed"

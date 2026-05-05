@@ -42,11 +42,11 @@ async function reset() {
 
   const result = await db
     .update(schema.drop)
-    .set({ status: "pre_live", updatedAt: new Date() })
+    .set({ status: "ready", updatedAt: new Date() })
     .where(eq(schema.drop.userId, creator.id))
 
   console.log(`✓ cleared Stripe account for ${email}`)
-  console.log(`✓ reset ${result.rowCount ?? "?"} drop(s) to pre_live`)
+  console.log(`✓ reset ${result.rowCount ?? "?"} drop(s) to ready`)
 }
 
 reset().catch((err) => {

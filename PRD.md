@@ -100,7 +100,7 @@ Calls Printful Mockup Generator API with print file URL and shirt color (white, 
 Handles upload and signed URL retrieval for original design files and print-ready files. Two separate key prefixes: `designs/` and `print-files/`.
 
 **Drop Manager**
-Handles drop CRUD, status transitions (`pre_live` → `live` → `closed`), and slug generation (auto from title, creator-overridable, unique per user). Enforces lock on price and design fields after `firstSaleAt` is set. Slug: URL-safe, lowercase, hyphenated.
+Handles drop CRUD, status transitions (`ready` → `live` → `closed`), and slug generation (auto from title, creator-overridable, unique per user). Enforces lock on price and design fields after `firstSaleAt` is set. Slug: URL-safe, lowercase, hyphenated.
 
 **Auth**
 BetterAuth magic link flow. User table extended with `slug` (unique creator username) and Stripe fields (`stripeAccountId`, `chargesEnabled`). Creator picks slug at account creation.
@@ -121,10 +121,10 @@ Wraps Printful REST API. Methods: submit order, generate mockup, fetch shipping 
 Handles `package_shipped`: updates order status to `shipped`, stores tracking number on order record.
 
 **Public Drop Page**
-Server-rendered. Shows mockup, price, size selector (S/M/L/XL/2XL), support email, production time copy, buy button. Renders three states: `pre_live` (coming soon), `live` (full page + checkout), `closed` (drop closed message). URL: `platform.com/[creator-slug]/[drop-slug]`.
+Server-rendered. Shows mockup, price, size selector (S/M/L/XL/2XL), support email, production time copy, buy button. Renders three states: `ready` (coming soon), `live` (full page + checkout), `closed` (drop closed message). URL: `platform.com/[creator-slug]/[drop-slug]`.
 
 **Creator Dashboard**
-Lists all drops for logged-in creator. Columns: title, status, share URL, actions. Shows "Enable checkout" CTA for drops in `pre_live` with no connected Stripe account or charges not enabled. Entry point for creating a new drop.
+Lists all drops for logged-in creator. Columns: title, status, share URL, actions. Shows "Enable checkout" CTA for drops in `ready` with no connected Stripe account or charges not enabled. Entry point for creating a new drop.
 
 ### Data Model
 
@@ -133,7 +133,7 @@ Two app-owned tables (BetterAuth owns auth tables):
 **drop**
 - id, userId, slug, title, description, supportEmail
 - markupCents, shirtColor (fixed: white in v0)
-- status (pre_live | live | closed)
+- status (ready | live | closed)
 - designFileKey, printFileKey, mockupUrl
 - placement (JSON: x, y, scale)
 - firstSaleAt, createdAt, updatedAt

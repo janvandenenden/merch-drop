@@ -11,7 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const dropStatusEnum = pgEnum("drop_status", [
-  "pre_live",
+  "ready",
   "live",
   "paused",
   "closed",
@@ -46,7 +46,7 @@ export const drop = pgTable(
     supportEmail: text("support_email").notNull(),
     markupCents: integer("markup_cents").notNull(),
     shirtColor: text("shirt_color").notNull().default("white"),
-    status: dropStatusEnum("status").notNull().default("pre_live"),
+    status: dropStatusEnum("status").notNull().default("ready"),
     designFileKey: text("design_file_key"),
     printFileKey: text("print_file_key"),
     mockupUrl: text("mockup_url"),

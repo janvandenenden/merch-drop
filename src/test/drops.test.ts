@@ -40,7 +40,7 @@ function makeDrop(overrides: Record<string, unknown> = {}) {
     supportEmail: "support@example.com",
     markupCents: 500,
     shirtColor: "white",
-    status: "pre_live",
+    status: "ready",
     designFileKey: null,
     printFileKey: null,
     mockupUrl: null,
@@ -147,8 +147,8 @@ describe("listDrops", () => {
 // ─── updateDrop — status transitions ─────────────────────────────────────────
 
 describe("updateDrop — status transitions", () => {
-  it("allows pre_live → live", async () => {
-    mockFindFirst.mockResolvedValue(makeDrop({ status: "pre_live" }))
+  it("allows ready → live", async () => {
+    mockFindFirst.mockResolvedValue(makeDrop({ status: "ready" }))
     mockUpdateReturning.mockResolvedValue([makeDrop({ status: "live" })])
 
     const { updateDrop } = await import("../lib/drops")
@@ -163,18 +163,18 @@ describe("updateDrop — status transitions", () => {
     await expect(updateDrop("drop-1", { status: "closed" })).resolves.toBeDefined()
   })
 
-  it("rejects pre_live → closed", async () => {
-    mockFindFirst.mockResolvedValue(makeDrop({ status: "pre_live" }))
+  it("rejects ready → closed", async () => {
+    mockFindFirst.mockResolvedValue(makeDrop({ status: "ready" }))
 
     const { updateDrop } = await import("../lib/drops")
     await expect(updateDrop("drop-1", { status: "closed" })).rejects.toThrow("Invalid status transition")
   })
 
-  it("rejects live → pre_live", async () => {
+  it("rejects live → ready", async () => {
     mockFindFirst.mockResolvedValue(makeDrop({ status: "live" }))
 
     const { updateDrop } = await import("../lib/drops")
-    await expect(updateDrop("drop-1", { status: "pre_live" })).rejects.toThrow("Invalid status transition")
+    await expect(updateDrop("drop-1", { status: "ready" })).rejects.toThrow("Invalid status transition")
   })
 
   it("rejects closed → live", async () => {

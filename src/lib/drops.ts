@@ -16,7 +16,7 @@ export type CreateDropParams = {
   supportEmail: string
   markupCents: number
   shirtColor?: string
-  status?: "pre_live" | "live"
+  status?: "ready" | "live"
   designFileKey?: string
   printFileKey?: string
   mockupKey?: string
@@ -35,11 +35,11 @@ export type UpdateDropParams = {
   mockupUrl?: string
   mockupKey?: string
   placement?: { x: number; y: number; scale: number; rotate: number }
-  status?: "pre_live" | "live" | "paused" | "closed"
+  status?: "ready" | "live" | "paused" | "closed"
 }
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  pre_live: ["live"],
+  ready: ["live"],
   live: ["paused", "closed"],
   paused: ["live", "closed"],
   closed: [],
@@ -76,7 +76,7 @@ export async function createDrop(params: CreateDropParams): Promise<Drop> {
       supportEmail: params.supportEmail,
       markupCents: params.markupCents,
       shirtColor: params.shirtColor ?? "white",
-      status: params.status ?? "pre_live",
+      status: params.status ?? "ready",
       designFileKey: params.designFileKey,
       printFileKey: params.printFileKey,
       mockupKey: params.mockupKey,

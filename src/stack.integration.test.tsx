@@ -48,7 +48,7 @@ describe("stack integration", () => {
   })
 
   it("next/font mock works", () => {
-    const font = Geist({ subsets: ["latin"] })
+    const font = Geist({ subsets: ["latin"], variable: "--font-geist-sans" })
     expect(font.variable).toBe("--font-geist-sans")
     const div = document.createElement("div")
     div.className = font.className

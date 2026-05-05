@@ -8,7 +8,7 @@
  * Safe to re-run — upserts on conflict.
  *
  * Public URLs after seeding:
- *   pre_live → http://localhost:3001/seed-creator/coming-soon-drop
+ *   ready    → http://localhost:3001/seed-creator/coming-soon-drop
  *   live     → http://localhost:3001/seed-creator/live-drop
  *   closed   → http://localhost:3001/seed-creator/closed-drop
  */
@@ -26,7 +26,7 @@ const DROPS = [
   {
     slug: "coming-soon-drop",
     title: "Coming Soon Drop",
-    status: "pre_live" as const,
+    status: "ready" as const,
     mockupUrl: null,
   },
   {

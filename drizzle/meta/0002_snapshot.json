@@ -169,7 +169,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'pre_live'"
+          "default": "'ready'"
         },
         "design_file_key": {
           "name": "design_file_key",
@@ -569,7 +569,7 @@
       "name": "drop_status",
       "schema": "public",
       "values": [
-        "pre_live",
+        "ready",
         "live",
         "paused",
         "closed"

@@ -47,7 +47,7 @@ function makeDrop(overrides: Record<string, unknown> = {}) {
     supportEmail: "support@example.com",
     markupCents: 500,
     shirtColor: "white",
-    status: "pre_live",
+    status: "ready",
     designFileKey: null,
     printFileKey: null,
     mockupUrl: null,
